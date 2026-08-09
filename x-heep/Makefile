@@ -1,0 +1,460 @@
+# Copyright EPFL contributors.
+# Licensed under the Apache License, Version 2.0, see LICENSE for details.
+# SPDX-License-Identifier: Apache-2.0
+
+MAKE	= make
+
+# Get the absolute path
+mkfile_path := $(shell dirname "$(realpath $(firstword $(MAKEFILE_LIST)))")
+$(info $$You are executing from: $(mkfile_path))
+
+# Parent project root directory (useful when vendoring X-HEEP in other projects)
+HEEP_EXTERNAL_ROOT 	?= .
+
+# Include the self-documenting tool
+export FILE_FOR_HELP=$(mkfile_path)/Makefile
+
+help:
+	${mkfile_path}/util/MakefileHelp
+
+# Setup to autogenerate python virtual environment
+VENVDIR?=$(WORKDIR)/.venv
+REQUIREMENTS_TXT ?= util/python-requirements.txt docs/python-requirements.txt
+include Makefile.venv
+
+# FUSESOC and Python values (default)
+ifndef CONDA_DEFAULT_ENV
+$(info USING VENV)
+FUSESOC 	= $(PWD)/$(VENV)/fusesoc
+PYTHON  	= $(PWD)/$(VENV)/python
+RV_PROFILE 	= $(PWD)/$(VENV)/rv_profile
+AREA_PLOT  	= $(PWD)/$(VENV)/area-plot
+else
+$(info USING MINICONDA $(CONDA_DEFAULT_ENV))
+FUSESOC 	:= $(shell which fusesoc)
+PYTHON  	:= $(shell which python)
+RV_PROFILE  := $(shell which rv_profile)
+AREA_PLOT   := $(shell which area-plot)
+endif
+
+# FuseSoC cores root. Defaults to the root of the parent project vendoring X-HEEP.
+FUSESOC_CORES_ROOT	?= $(HEEP_EXTERNAL_ROOT)
+
+# RegTool and StructGen path
+REGTOOL 			?= $(mkfile_path)/hw/vendor/pulp_platform/register_interface/vendor/lowrisc_opentitan/util/regtool.py
+PERIPH_STRUCTS_GEN 	?= $(mkfile_path)/util/periph_structs_gen/periph_structs_gen.py
+TEMPLATE_FILE 		?= $(mkfile_path)/util/periph_structs_gen/periph_structs.tpl
+
+# Build directories
+BUILD_DIR         = build
+FUSESOC_BUILD_DIR = $(shell find $(BUILD_DIR) -maxdepth 1 -type d -name 'openhwgroup.org_systems_core-v-mini-mcu_*' 2>/dev/null | sort -V | head -n 1)
+VERILATOR_DIR     = $(FUSESOC_BUILD_DIR)/sim-verilator
+QUESTASIM_DIR     = $(FUSESOC_BUILD_DIR)/sim-modelsim
+
+# Project options are based on the app to be built (default - hello_world)
+PROJECT ?= hello_world
+
+# Folder where the linker scripts are located
+LINK_FOLDER ?= $(mkfile_path)/sw/linker
+# Linker options are 'on_chip' (default),'flash_load','flash_exec','freertos'
+LINKER ?= on_chip
+
+# Target options are 'sim' (default) and 'pynq-z2' and 'nexys-a7-100t'
+TARGET ?= sim
+
+# Mcu-gen configuration files
+X_HEEP_CFG  ?= configs/general.hjson
+PADS_CFG ?= configs/pad_cfg.py
+PYTHON_X_HEEP_CFG ?=
+
+# MCU-Gen template files to generate
+MCU_GEN_TEMPLATES = $(shell find . \
+  \( -path './hw/vendor/*' ! -path './hw/vendor/xheep' ! -path './hw/vendor/xheep/*' -o \
+     -path './util/*' ! -path './util/profile' ! -path './util/profile/*' -o \
+     -path './test/*' \) -prune -o \
+  -name '*.tpl' -print)
+MCU_GEN_OUTPUTS = $(patsubst %.tpl,%, $(MCU_GEN_TEMPLATES))
+
+# Optionally, additional external template files can be provided to mcu-gen
+EXTERNAL_MCU_GEN_TEMPLATES ?= 
+EXTERNAL_MCU_GEN_OUTPUTS = $(patsubst %.tpl,%, $(EXTERNAL_MCU_GEN_TEMPLATES))
+
+# Compiler options are 'gcc' (default) and 'clang'
+COMPILER 		?= gcc
+# Compiler prefix options are 'riscv32-corev-' (default) and 'riscv32-unknown-'
+COMPILER_PREFIX ?= $(shell basename $$(ls $(RISCV_XHEEP)/bin/*gcc 2>/dev/null | head -1) | sed 's/elf-gcc$$//')
+# Compiler flags to be passed (for both linking and compiling)
+COMPILER_FLAGS 	?=
+# Arch options are any RISC-V ISA string supported by the CPU. Default 'rv32imc_zicsr'
+ARCH     		?= rv32imc_zicsr
+# Tell clang to use the gcc link instead of the llvm linker (useful for old clang). Default '0' (set it to 1)
+CLANG_LINKER_USE_LD ?= 0
+
+# Path relative from the location of sw/Makefile from which to fetch source files. The directory of that file is the default value.
+SOURCE ?= $(".")
+
+# Simulation engines options are verilator (default) and questasim
+SIMULATOR ?= verilator
+# SIM_ARGS: Additional simulation arguments for run-app-verilator based on input parameters:
+# - MAX_SIM_TIME: Maximum simulation time in clock cycles (unlimited if not provided)
+SIM_ARGS += $(if $(MAX_SIM_TIME),+max_sim_time=$(MAX_SIM_TIME))
+
+# Testing flags
+# Optional TEST_FLAGS options are '--compile-only'
+TEST_FLAGS=
+
+# Flash read address for testing, in hexadecimal format 0x0000
+FLASHREAD_ADDR ?= 0x0
+FLASHREAD_FILE ?= $(mkfile_path)/flashcontent.hex
+FLASHREAD_BYTES ?= 256
+# Binary to store in flash memory
+FLASHWRITE_FILE ?= $(mkfile_path)/sw/build/main.hex
+# Max address in the hex file, used to program the flash
+ifeq ($(wildcard $(FLASHWRITE_FILE)),)
+	MAX_HEX_ADDRESS  := 0
+	MAX_HEX_ADDRESS_DEC := 0
+	BYTES_AFTER_MAX_HEX_ADDRESS := 0
+	FLASHWRITE_BYTES := 0
+else
+	MAX_HEX_ADDRESS  := $(shell cat $(FLASHWRITE_FILE) | grep "@" | tail -1 | cut -c2-)
+	MAX_HEX_ADDRESS_DEC := $(shell printf "%d" 0x$(MAX_HEX_ADDRESS))
+	BYTES_AFTER_MAX_HEX_ADDRESS := $(shell tac $(FLASHWRITE_FILE) | awk 'BEGIN {count=0} /@/ {print count; exit} {count++}')
+	FLASHWRITE_BYTES := $(shell echo $$(( $(MAX_HEX_ADDRESS_DEC) + $(BYTES_AFTER_MAX_HEX_ADDRESS)*16 )))
+endif
+
+# Area plot default configuration
+AREA_PLOT_RPT    ?= $(word 1, $(shell [ -d $(BUILD_DIR) ] && find $(BUILD_DIR) -type f -name "*area*.rpt" 2>/dev/null)) # path to the area report file
+AREA_PLOT_OUTDIR ?= $(BUILD_DIR)/area-plot/ # output directory for the area plot
+AREA_PLOT_TOP    ?=# top level module to consider for the area plot (automatically infer)
+
+# Remote upload to PYNQ
+FUSESOC_BUILD_NAME 	:= $(notdir $(FUSESOC_BUILD_DIR))
+BD_NAME				:= xilinx_core_v_mini_mcu
+BITSTREAM_SOURCE   	:= $(FUSESOC_BUILD_DIR)/$(FPGA_BOARD)-vivado/$(FUSESOC_BUILD_NAME).runs/impl_1/$(BD_NAME)_wrapper.bit
+HWH_SOURCE 			:= $(FUSESOC_BUILD_DIR)/$(FPGA_BOARD)-vivado/$(FUSESOC_BUILD_NAME).gen/sources_1/bd/xilinx_ps_wizard/hw_handoff/xilinx_ps_wizard.hwh 
+
+# Vendored IPs
+VENDOR_FILES	:= $(shell find hw/vendor sw/vendor util -maxdepth 2 -type f -name "*.vendor.hjson" -print)
+VENDOR_LOCKS	:= $(subst .vendor.hjson,.lock.hjson,$(VENDOR_FILES))
+
+# Export variables to sub-makefiles
+export
+
+## @section Conda
+conda:
+	conda env create -f util/conda_environment.yml
+
+## @section Installation
+
+## Generates mcu files core-v-mini-mcu files and build the design with fusesoc
+## @param CPU=[cv32e20(default),cv32e40p,cv32e40x,cv32e40px]
+## @param BUS=[onetoM(default),NtoM]
+## @param MEMORY_BANKS=[2(default)to(16-MEMORY_BANKS_IL)]
+## @param MEMORY_BANKS_IL=[0(default),2,4,8]
+## @param X_HEEP_CFG=[configs/general.hjson(default),<path-to-config-file>]
+## @param PYTHON_X_HEEP_CFG=[configs/general.py(default),<path-to-config-file>]
+mcu-gen:
+	$(PYTHON) util/xheep_gen/mcu_gen.py --config $(X_HEEP_CFG) --python_config $(PYTHON_X_HEEP_CFG) --pads_cfg $(PADS_CFG) --outtpl "$(MCU_GEN_TEMPLATES)" --externaltpl "$(EXTERNAL_MCU_GEN_TEMPLATES)" --cpu $(CPU) --bus $(BUS) --memorybanks $(MEMORY_BANKS) --memorybanks_il $(MEMORY_BANKS_IL)
+
+	@echo "### MCU-GEN completed! Running FuseSoC register generators..."	
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --target=sim --tool=verilator $(FUSESOC_FLAGS) --setup openhwgroup.org:systems:core-v-mini-mcu
+
+	$(MAKE) verible
+	$(MAKE) format-python
+
+## Display mcu_gen.py help
+mcu-gen-help:
+	$(PYTHON) util/xheep_gen/mcu_gen.py -h
+
+## Runs verible formating
+verible: | .check-verible
+	util/format-verible;
+
+## Runs black formating for python files
+format-python:
+	$(PYTHON) -m black util/xheep_gen
+	$(PYTHON) -m black util/periph_structs_gen
+	$(PYTHON) -m black util/waiver-gen.py
+	$(PYTHON) -m black util/c_gen.py
+	$(PYTHON) -m black test/test_x_heep_gen
+	$(PYTHON) -m black test/test_apps
+	$(PYTHON) -m black configs
+
+## @section APP FW Build
+
+## Generates the build folder in sw using CMake to build (compile and linking)
+## @param PROJECT=<folder_name_of_the_project_to_be_built>
+## @param TARGET=sim(default),systemc,pynq-z2,nexys-a7-100t,genesys2,aup-zu3,zcu102,zcu104
+## @param LINKER=on_chip(default),flash_load,flash_exec
+## @param COMPILER=gcc(default),clang
+## @param COMPILER_PREFIX=riscv32-corev-(default),riscv32-unknown-
+## @param ARCH=rv32imc(default),<any_RISC-V_ISA_string_supported_by_the_CPU>
+app: clean-app
+	@$(MAKE) -C sw PROJECT=$(PROJECT) TARGET=$(TARGET) LINKER=$(LINKER) LINK_FOLDER=$(LINK_FOLDER) COMPILER=$(COMPILER) COMPILER_PREFIX=$(COMPILER_PREFIX) COMPILER_FLAGS="$(COMPILER_FLAGS)" ARCH=$(ARCH) SOURCE=$(SOURCE) CLANG_LINKER_USE_LD=$(CLANG_LINKER_USE_LD) \
+	|| { \
+	echo "\033[0;31mHmmm... seems like the compilation failed...\033[0m"; \
+	echo "\033[0;31mIf you do not understand why, it is likely that you either:\033[0m"; \
+	echo "\033[0;31m  a) offended the Leprechaun of Electronics\033[0m"; \
+	echo "\033[0;31m  b) forgot to run make mcu-gen\033[0m"; \
+	echo "\033[0;31m  c) forgot to set the correct compiler parameters (check the docs!)\033[0m"; \
+	echo "\033[0;31mI would start by checking b) or c) if I were you!\033[0m"; \
+	exit 1; \
+	}
+	@$(PYTHON) scripts/building/mem_usage.py \
+		--elf $(mkfile_path)/sw/build/main.elf \
+		--ld $(mkfile_path)/sw/build/main.ld \
+		--mcu-pkg $(mkfile_path)/hw/core-v-mini-mcu/include/core_v_mini_mcu_pkg.sv
+
+## Just list the different application names available
+app-list:
+	@echo "Note: Applications outside the X-HEEP sw/applications directory will not be listed."
+	tree sw/applications/
+
+## @section Simulation
+
+## Verilator simulation with C++
+verilator-build: | .check-verilator
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --build openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
+
+mine-mcu-gen:
+	$(MAKE) mcu-gen X_HEEP_CFG=configs/cv32e40px_fpu_dma.hjson
+
+all-build-run:
+	$(MAKE) verilator-build && $(MAKE) app PROJECT=$(PROJECT) ARCH=rv32imfc_zicsr && $(MAKE) verilator-run 
+
+## Verilator simulation with SystemC
+verilator-build-sc: | .check-verilator
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim_sc --tool=verilator $(FUSESOC_FLAGS) --build openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
+
+## Questasim simulation
+questasim-build:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim --tool=modelsim $(FUSESOC_FLAGS) --build openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
+
+## Questasim simulation with HDL optimized compilation
+questasim-build-opt: questasim-build
+	$(MAKE) -C $(QUESTASIM_DIR) opt
+
+## Questasim simulation with HDL optimized compilation and UPF power domain description
+## @param FUSESOC_PARAM="--USE_UPF"
+questasim-build-opt-upf: questasim-build
+	$(MAKE) -C $(QUESTASIM_DIR) opt-upf
+
+## VCS simulation
+## @param CPU=cv32e20(default),cv32e40p,cv32e40x,cv32e40px
+## @param BUS=onetoM(default),NtoM
+vcs-build:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim --tool=vcs $(FUSESOC_FLAGS) --build openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
+
+## VCS-AMS simulation:
+vcs-ams-build:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim --flag "ams_sim" --tool=vcs $(FUSESOC_FLAGS) --build openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
+
+## xcelium simulation
+xcelium-build:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim --tool=xcelium $(FUSESOC_FLAGS) --build openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
+
+## Generates the build output for helloworld application
+## Uses verilator to simulate the HW model and run the FW
+verilator-run-helloworld: mcu-gen verilator-build
+	$(MAKE) -C sw PROJECT=hello_world TARGET=$(TARGET) LINKER=$(LINKER) COMPILER=$(COMPILER) COMPILER_PREFIX=$(COMPILER_PREFIX) ARCH=$(ARCH);
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --run openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) \
+		--run_options="+firmware=../../../sw/build/main.hex $(SIM_ARGS)"
+
+## First builds the app and then uses Verilator to simulate the HW model and run the FW
+verilator-run-app: app
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --run openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) \
+		--run_options="+firmware=../../../sw/build/main.hex $(SIM_ARGS)"
+
+## Launches the RTL simulation with the compiled firmware (`app` target) using
+## the C++ Verilator model previously built (`verilator-build` target).
+verilator-run:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --run openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) \
+		--run_options="+firmware=../../../sw/build/main.hex $(SIM_ARGS)"
+
+## Launches the RTL simulation with the compiled firmware (`app` target) using
+## the SystemC Verilator model previously built (`verilator-build-sc` target).
+verilator-run-sc:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim_sc --tool=verilator $(FUSESOC_FLAGS) --run openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) \
+		--run_options="+firmware=../../../sw/build/main.hex $(SIM_ARGS)"
+
+## Opens gtkwave to view the waveform generated by the last verilator simulation
+verilator-waves: .check-gtkwave
+	gtkwave $(VERILATOR_DIR)/waveform.fst
+
+## Launches the RTL simulation with the compiled firmware (`app` target) using
+## the Questasim model previously built (`questasim-build` target).
+questasim-run: 
+	$(MAKE) -C $(QUESTASIM_DIR) run PLUSARGS="c firmware=../../../sw/build/main.hex"
+
+## First builds the app and then uses Questasim to simulate the HW model and run the FW
+questasim-run-app: app
+	$(MAKE) -C $(QUESTASIM_DIR) run PLUSARGS="c firmware=../../../sw/build/main.hex"
+
+## Launches the RTL simulation with the compiled firmware (`app` target) using
+## the Questasim model with HDL optimized compilation previously built (`questasim-build-opt` target).
+questasim-run-opt: 
+	$(MAKE) -C $(QUESTASIM_DIR) run RUN_OPT=1 PLUSARGS="c firmware=../../../sw/build/main.hex"
+
+## First builds the app and then uses Questasim to simulate the HW optimized model and run the FW
+questasim-run-opt-app: app
+	$(MAKE) -C $(QUESTASIM_DIR) run RUN_OPT=1 PLUSARGS="c firmware=../../../sw/build/main.hex"
+
+## @section Vivado
+
+## Builds (synthesis and implementation) the bitstream for the FPGA version using Vivado
+## @param FPGA_BOARD=pynq-z2,nexys-a7-100t,genesys2,aup-zu3,zcu102,zcu104
+## @param FUSESOC_FLAGS=--flag=<flagname>
+vivado-fpga:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=$(FPGA_BOARD) $(FUSESOC_FLAGS) --build openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildvivado.log
+
+vivado-fpga-nobuild:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=$(FPGA_BOARD) $(FUSESOC_FLAGS) --setup openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildvivado.log
+
+## Loads the generated bitstream into the FPGA
+## @param FPGA_BOARD=pynq-z2,nexys-a7-100t,genesys2,aup-zu3,zcu102,zcu104
+vivado-fpga-pgm:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=$(FPGA_BOARD) $(FUSESOC_FLAGS) --run openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee programfpga.log
+
+## Loads the generated bitstream into the remote FPGA 
+## @param FPGA_BOARD=pynq-z2,aup-zu3
+## @param REMOTE=user@host
+## @param REMOTE_DIR=/remote/dir
+vivado-fpga-remote-pgm:
+	scp $(BITSTREAM_SOURCE) $(REMOTE):$(REMOTE_DIR)/
+	scp $(HWH_SOURCE) $(REMOTE):$(REMOTE_DIR)/$(BD_NAME)_wrapper.hwh
+
+## @section ASIC
+## Note that for this step you need to provide technology-dependent files (e.g., libs, constraints)
+asic:
+	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=asic_synthesis $(FUSESOC_FLAGS) --setup openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee builddesigncompiler.log
+
+openroad-sky130:
+	git checkout hw/vendor/pulp_platform/common_cells/*
+	sed -i 's/(\*[^\n]*\*)//g' hw/vendor/pulp_platform/common_cells/src/*.sv
+	$(FUSESOC) --verbose --cores-root $(FUSESOC_CORES_ROOT) run --target=asic_yosys_synthesis --flag=use_sky130 openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildopenroad.log
+	git checkout hw/vendor/pulp_platform/common_cells/*
+
+## @section Program, Execute, and Debug w/ EPFL_Programmer
+
+## Read the id from the EPFL_Programmer flash
+flash-readid:
+	cd sw/vendor/yosyshq_icestorm/iceprog; make; \
+	./iceprog -d i:0x0403:0x6011 -I B -t;
+
+## Loads the obtained binary to the EPFL_Programmer flash
+flash-prog:
+	cd sw/vendor/yosyshq_icestorm/iceprog; make; \
+	./iceprog -a $(FLASHWRITE_BYTES) -d i:0x0403:0x6011 -I B $(FLASHWRITE_FILE);
+
+## Read the EPFL_Programmer flash
+flash-read:
+	cd sw/vendor/yosyshq_icestorm/iceprog; make; \
+	./iceprog -d i:0x0403:0x6011 -I B -o $(shell printf "%d" $(FLASHREAD_ADDR)) -R $(FLASHREAD_BYTES) $(FLASHREAD_FILE);
+
+## Erase the EPFL_Programmer flash
+flash-erase:
+	cd sw/vendor/yosyshq_icestorm/iceprog; make; \
+	./iceprog -d i:0x0403:0x6011 -I B -b;
+
+## Run openOCD w/ EPFL_Programmer
+openOCD_epflp:
+	xterm -e openocd -f ./tb/core-v-mini-mcu-esl-programmer.cfg;
+
+## Run openOCD w/ BSCAN of the Pynq-Z2 board
+openOCD_bscan:
+	xterm -e openocd -f ./tb/core-v-mini-mcu-pynq-z2-bscan.cfg;
+
+## Start GDB
+gdb_connect:
+	$(MAKE) -C sw gdb_connect
+
+## @section Testing
+
+## Run the tests for X-HEEP. Cleans and rebuilds all the project.
+.PHONY: test
+test:
+	$(MAKE) mcu-gen X_HEEP_CFG=configs/ci.hjson
+	$(RM) test/*.log
+	$(PYTHON) test/test_apps/test_apps.py $(TEST_FLAGS) 2>&1 | tee test/test_apps/test_apps.log
+	@echo "You can also find the output in test/test_apps/test_apps.log"
+	$(PYTHON) test/test_x_heep_gen/test_peripherals.py
+	@echo "You can also find the peripheral test outputs in test/test_x_heep_gen/outputs"
+
+## Compares two mcu-gen runs and lists the differences in the generated files. 
+## It can be used to manually check if a change in the configuration or in the mcu-gen code has an
+## effect on the generated files.
+.PHONY: compare-mcu-gen
+compare-mcu-gen:
+	$(PYTHON) test/test_x_heep_gen/compare_mcu_gen.py
+
+## Builds the specified app, loads it into the programmer's flash and then opens picocom to see the output
+## @param PROJECT=<folder_name_of_the_project_to_be_built>
+run-fpga-flash-load:
+	$(MAKE) app LINKER=flash_load TARGET=pynq-z2 PROJECT=$(PROJECT)
+	$(MAKE) flash-prog || { \
+		echo "\033[0;31mTry holding the RESET button on the FPGA while loading the flash.\033[0m"; \
+		exit 1; \
+	}
+	@echo "\033[0;33mYou can exit Picocom with ctrl+A, ctrl+Q\033[0m";
+	@echo "\033[0;33mPress the RESET button on the FPGA to start the program\033[0m";
+	picocom -b 9600 -r -l --imap lfcrlf /dev/serial/by-id/usb-FTDI_Quad_RS232-HS-if02-port0;
+
+## @section Profiling
+## Run the profiling on a RTL simulation generating a flamegraph.
+.PHONY: profile
+profile:
+	bash util/profile/run_profile.sh $(RV_PROFILE)
+
+
+## @section Area Plot
+## Generate post-synthesis area plot given a synthesis area report
+# For additional arguments use area-plot --help
+.PHONY: area-plot
+area-plot:
+	$(AREA_PLOT) --filename $(AREA_PLOT_RPT) --out-dir $(AREA_PLOT_OUTDIR) --top-module $(AREA_PLOT_TOP)
+
+## @section Vendored IPs
+## Update the vendored IPs based on the .vendor.hjson description files
+.PHONY: vendor-update
+vendor-update: $(VENDOR_LOCKS)
+	python3 util/check-vendor.py
+
+$(VENDOR_LOCKS): %.lock.hjson: %.vendor.hjson util/vendor.py
+	@echo "### Updating vendored IP '$(notdir $*)'..."
+	python3 util/vendor.py -vU $<
+
+.PHONY: vendor-clean
+vendor-clean:
+	$(RM) $(VENDOR_LOCKS)
+
+## @section Cleaning commands
+
+## Remove the sw build folder
+.PHONY: clean-app
+clean-app:
+	$(RM) -r sw/build
+
+## Remove the build folders
+.PHONY: clean
+clean: clean-app
+	$(RM) -r $(BUILD_DIR)
+	$(RM) $(MCU_GEN_OUTPUTS) $(EXTERNAL_MCU_GEN_OUTPUTS)
+	find . -type f -name "*_reg_gen.cache" -delete
+
+## Leave the repository in a clean state, removing all generated files. For now, it just calls clean.
+.PHONY: clean-all
+clean-all: clean
+
+## @section Utilities
+# Check if a program is available in PATH
+define CHECK_PROGRAM
+.PHONY: .check-$(1)
+.check-$(1):
+	@command -v $(2) >/dev/null 2>&1 || { \
+		printf "### ERROR: '%s' is not in PATH.\\n" "$(2)" >&2; \
+		exit 1; \
+	}
+endef
+$(eval $(call CHECK_PROGRAM,gtkwave,gtkwave))
+$(eval $(call CHECK_PROGRAM,verible,verible-verilog-format))
+$(eval $(call CHECK_PROGRAM,verilator,verilator))

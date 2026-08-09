@@ -1,0 +1,349 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -max_paths 1
+Design : cv32e40px_top_FPU1
+Version: S-2021.06-SP5
+Date   : Sun Jul  5 10:44:04 2026
+****************************************
+
+ # A fanout number of 1000 was used for high fanout net computations.
+
+Operating Conditions: ss_typical_max_0p81v_125c   Library: sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+Wire Load Model Mode: top
+
+  Startpoint: core_i/ex_stage_i/gen_apu.apu_disp_i/valid_inflight_reg
+              (rising edge-triggered flip-flop clocked by clk)
+  Endpoint: core_i/id_stage_i/apu_operands_ex_o_reg[1][12]
+            (rising edge-triggered flip-flop clocked by clk)
+  Path Group: clk
+  Path Type: max
+
+  Des/Clust/Port     Wire Load Model       Library
+  ------------------------------------------------
+  cv32e40px_top_FPU1 Small                 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+
+  Point                                                   Incr       Path
+  --------------------------------------------------------------------------
+  clock clk (rise edge)                                   0.00       0.00
+  clock network delay (ideal)                             0.00       0.00
+  core_i/ex_stage_i/gen_apu.apu_disp_i/valid_inflight_reg/CK (DFFRPQ_X1M_A12TR40)
+                                                          0.00 #     0.00 r
+  core_i/ex_stage_i/gen_apu.apu_disp_i/valid_inflight_reg/Q (DFFRPQ_X1M_A12TR40)
+                                                          0.14       0.14 f
+  U7582/Y (OR2_X1M_A12TR40)                               0.10       0.24 f
+  U5512/Y (NAND2_X2A_A12TR40)                             0.04       0.28 r
+  U6141/Y (AOI2XB1_X2M_A12TR40)                           0.04       0.31 f
+  U5532/Y (NOR2_X3A_A12TR40)                              0.07       0.38 r
+  U6805/Y (NOR2_X6A_A12TR40)                              0.03       0.41 f
+  U5531/Y (INV_X1M_A12TR40)                               0.07       0.48 r
+  U5529/Y (INV_X6M_A12TR40)                               0.06       0.54 f
+  U7462/Y (OAI2XB1_X1M_A12TR40)                           0.24       0.78 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/operands_i[0][30] (fpnew_fma_multi_10_00000000_1__logic_Z_1yB__790242)
+                                                          0.00       0.78 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1520/Y (OR4_X0P7M_A12TR40)
+                                                          0.15       0.93 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U693/Y (NOR2_X2A_A12TR40)
+                                                          0.04       0.97 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1162/Y (AND2_X1M_A12TR40)
+                                                          0.06       1.03 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1160/Y (INV_X0P5B_A12TR40)
+                                                          0.05       1.08 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4476/Y (NOR2_X2M_A12TR40)
+                                                          0.03       1.11 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1147/Y (NOR2_X0P7M_A12TR40)
+                                                          0.11       1.21 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4306/Y (NOR2_X1A_A12TR40)
+                                                          0.06       1.28 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1474/Y (AOI21_X1P4M_A12TR40)
+                                                          0.08       1.36 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2194/Y (OAI21_X2M_A12TR40)
+                                                          0.04       1.40 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U101/Y (INV_X0P8M_A12TR40)
+                                                          0.05       1.45 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2946/Y (XOR2_X0P7M_A12TR40)
+                                                          0.06       1.51 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4481/Y (AND2_X1M_A12TR40)
+                                                          0.09       1.60 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4482/Y (INV_X1M_A12TR40)
+                                                          0.05       1.65 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2943/CO (ADDF_X2M_A12TR40)
+                                                          0.09       1.74 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2942/CO (ADDF_X2M_A12TR40)
+                                                          0.07       1.81 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2941/CO (ADDF_X2M_A12TR40)
+                                                          0.07       1.88 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2940/CO (ADDF_X2M_A12TR40)
+                                                          0.07       1.96 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2177/CO (ADDF_X2M_A12TR40)
+                                                          0.07       2.03 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2175/CO (ADDF_X2M_A12TR40)
+                                                          0.07       2.10 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1466/Y (XOR2_X2M_A12TR40)
+                                                          0.07       2.17 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2168/Y (OAI21_X4M_A12TR40)
+                                                          0.06       2.23 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4076/Y (AOI2XB1_X2M_A12TR40)
+                                                          0.08       2.32 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U100/Y (INV_X3M_A12TR40)
+                                                          0.04       2.35 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U99/Y (INV_X3M_A12TR40)
+                                                          0.06       2.41 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U589/Y (NAND2_X3B_A12TR40)
+                                                          0.05       2.46 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U88/Y (INV_X2M_A12TR40)
+                                                          0.08       2.54 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1058/Y (NAND2_X0P7B_A12TR40)
+                                                          0.06       2.60 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1043/Y (NAND3_X1A_A12TR40)
+                                                          0.09       2.69 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1437/Y (INV_X0P5B_A12TR40)
+                                                          0.07       2.76 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1432/Y (NOR2_X0P5B_A12TR40)
+                                                          0.07       2.83 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2905/Y (NAND4_X0P5A_A12TR40)
+                                                          0.08       2.91 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2876/Y (AOI22_X0P7M_A12TR40)
+                                                          0.13       3.03 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U118/Y (INV_X0P5B_A12TR40)
+                                                          0.09       3.13 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2828/Y (OA21A1OI2_X3M_A12TR40)
+                                                          0.09       3.22 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2079/Y (INV_X0P8M_A12TR40)
+                                                          0.04       3.25 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1338/Y (NAND2_X1P4B_A12TR40)
+                                                          0.03       3.29 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U957/Y (INV_X1M_A12TR40)
+                                                          0.04       3.32 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1337/Y (NAND2_X1P4B_A12TR40)
+                                                          0.03       3.35 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2073/Y (OAI21_X1M_A12TR40)
+                                                          0.05       3.40 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4414/Y (AOI21_X1M_A12TR40)
+                                                          0.09       3.49 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3223/Y (OAI21_X1M_A12TR40)
+                                                          0.06       3.55 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4426/Y (AOI21_X1M_A12TR40)
+                                                          0.09       3.64 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3224/Y (OAI21_X1M_A12TR40)
+                                                          0.06       3.70 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3337/Y (AOI21_X1M_A12TR40)
+                                                          0.09       3.79 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2068/Y (OAI21_X1M_A12TR40)
+                                                          0.06       3.85 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4431/Y (AOI21_X1M_A12TR40)
+                                                          0.10       3.95 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3225/Y (OAI21_X2M_A12TR40)
+                                                          0.05       4.00 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1333/Y (AOI21_X2M_A12TR40)
+                                                          0.06       4.05 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2065/Y (OAI21_X2M_A12TR40)
+                                                          0.04       4.09 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4396/Y (AOI21_X1M_A12TR40)
+                                                          0.08       4.17 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4409/Y (OAI21_X1M_A12TR40)
+                                                          0.07       4.24 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2062/Y (AOI21_X2M_A12TR40)
+                                                          0.06       4.30 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4018/Y (OAI21_X1M_A12TR40)
+                                                          0.05       4.35 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4013/Y (AOI21_X1M_A12TR40)
+                                                          0.09       4.44 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2791/Y (OAI21_X1M_A12TR40)
+                                                          0.06       4.51 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3341/Y (AOI21_X1M_A12TR40)
+                                                          0.09       4.60 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2785/Y (OAI21_X1M_A12TR40)
+                                                          0.06       4.66 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3250/Y (AOI21_X1M_A12TR40)
+                                                          0.10       4.75 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3226/Y (OAI21_X2M_A12TR40)
+                                                          0.05       4.81 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U954/Y (AOI21_X3M_A12TR40)
+                                                          0.06       4.86 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U380/Y (OAI21_X3M_A12TR40)
+                                                          0.04       4.90 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2057/Y (AOI21_X4M_A12TR40)
+                                                          0.05       4.95 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2055/Y (OAI21_X4M_A12TR40)
+                                                          0.03       4.98 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2053/Y (AOI21_X4M_A12TR40)
+                                                          0.04       5.03 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4419/Y (OAI21_X1M_A12TR40)
+                                                          0.05       5.08 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2766/Y (AOI21_X2M_A12TR40)
+                                                          0.07       5.14 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U953/Y (OAI21_X2M_A12TR40)
+                                                          0.05       5.19 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2049/Y (AOI21_X4M_A12TR40)
+                                                          0.05       5.24 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2047/Y (OAI21_X4M_A12TR40)
+                                                          0.03       5.27 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2045/Y (AOI21_X4M_A12TR40)
+                                                          0.05       5.32 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2043/Y (OAI21_X4M_A12TR40)
+                                                          0.03       5.35 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2040/Y (AOI21_X4M_A12TR40)
+                                                          0.05       5.40 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2039/Y (OAI21_X4M_A12TR40)
+                                                          0.03       5.43 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2036/Y (AOI21_X4M_A12TR40)
+                                                          0.05       5.48 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2031/Y (OAI21_X4M_A12TR40)
+                                                          0.03       5.52 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2028/Y (AOI21_X4M_A12TR40)
+                                                          0.05       5.56 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2027/Y (OAI21_X2M_A12TR40)
+                                                          0.03       5.60 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4422/Y (AOI21_X1M_A12TR40)
+                                                          0.09       5.69 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3346/Y (OAI21_X2M_A12TR40)
+                                                          0.05       5.74 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2020/Y (AOI21_X3M_A12TR40)
+                                                          0.06       5.80 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2019/Y (OAI21_X3M_A12TR40)
+                                                          0.04       5.83 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2017/Y (AOI21_X4M_A12TR40)
+                                                          0.05       5.88 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U945/Y (OAI21_X3M_A12TR40)
+                                                          0.04       5.92 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2013/Y (AOI21_X4M_A12TR40)
+                                                          0.05       5.97 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2011/Y (OAI21_X4M_A12TR40)
+                                                          0.03       6.00 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U374/Y (AOI21_X4M_A12TR40)
+                                                          0.05       6.05 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2749/Y (OAI21_X4M_A12TR40)
+                                                          0.03       6.08 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2009/Y (AOI21_X4M_A12TR40)
+                                                          0.05       6.13 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2005/Y (OAI21_X4M_A12TR40)
+                                                          0.03       6.17 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2748/Y (AOI21_X6M_A12TR40)
+                                                          0.04       6.21 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U942/Y (OAI21_X4M_A12TR40)
+                                                          0.03       6.25 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2747/Y (AOI21_X6M_A12TR40)
+                                                          0.05       6.29 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2746/Y (OAI21_X6M_A12TR40)
+                                                          0.03       6.32 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2744/Y (AOI21_X6M_A12TR40)
+                                                          0.04       6.36 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4085/Y (OAI21_X1M_A12TR40)
+                                                          0.05       6.41 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3969/Y (AOI21_X1M_A12TR40)
+                                                          0.09       6.50 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4427/Y (OAI21_X1M_A12TR40)
+                                                          0.06       6.56 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4207/Y (AOI21_X1M_A12TR40)
+                                                          0.09       6.65 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4211/Y (OAI21_X1M_A12TR40)
+                                                          0.07       6.72 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2738/Y (AOI21_X3M_A12TR40)
+                                                          0.06       6.78 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U42/Y (OAI21_X2M_A12TR40)
+                                                          0.04       6.82 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2736/Y (AOI21_X1P4M_A12TR40)
+                                                          0.07       6.89 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1986/Y (OAI21_X2M_A12TR40)
+                                                          0.05       6.93 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U940/Y (AOI21_X4M_A12TR40)
+                                                          0.05       6.98 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U939/Y (OAI21_X3M_A12TR40)
+                                                          0.04       7.02 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1982/Y (AOI21_X4M_A12TR40)
+                                                          0.05       7.07 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1978/Y (OAI21_X4M_A12TR40)
+                                                          0.03       7.10 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2731/Y (AOI21_X6M_A12TR40)
+                                                          0.04       7.15 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1977/Y (OAI21_X4M_A12TR40)
+                                                          0.03       7.18 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U3347/Y (AOI21_X1M_A12TR40)
+                                                          0.08       7.26 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U39/Y (XOR2_X0P7M_A12TR40)
+                                                          0.09       7.36 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U935/Y (INV_X1M_A12TR40)
+                                                          0.04       7.40 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4446/Y (OAI21_X1M_A12TR40)
+                                                          0.07       7.47 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2648/Y (NOR2_X2M_A12TR40)
+                                                          0.04       7.51 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4564/Y (OAI22_X1M_A12TR40)
+                                                          0.05       7.56 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2627/Y (NAND2_X0P7A_A12TR40)
+                                                          0.05       7.61 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2618/Y (OAI211_X1M_A12TR40)
+                                                          0.06       7.68 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4565/Y (AO21A1AI2_X1M_A12TR40)
+                                                          0.07       7.75 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2575/Y (OA1B2_X6M_A12TR40)
+                                                          0.08       7.82 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2570/Y (INV_X5M_A12TR40)
+                                                          0.05       7.88 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1613/Y (NOR2_X8A_A12TR40)
+                                                          0.04       7.92 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4596/Y (INV_X1M_A12TR40)
+                                                          0.21       8.13 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4336/Y (MXIT2_X1M_A12TR40)
+                                                          0.10       8.23 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1587/Y (AOI21_X4M_A12TR40)
+                                                          0.10       8.32 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4597/Y (NOR2_X8A_A12TR40)
+                                                          0.05       8.37 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U2550/Y (NAND2_X1A_A12TR40)
+                                                          0.07       8.44 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4620/Y (AOI21_X1M_A12TR40)
+                                                          0.05       8.49 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1579/Y (NOR2_X2A_A12TR40)
+                                                          0.05       8.55 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4621/Y (OAI21_X1M_A12TR40)
+                                                          0.04       8.59 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U737/Y (OAI211_X2M_A12TR40)
+                                                          0.07       8.66 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1570/Y (NAND2_X2A_A12TR40)
+                                                          0.05       8.71 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1569/Y (NOR2_X4A_A12TR40)
+                                                          0.04       8.76 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U725/Y (INV_X4M_A12TR40)
+                                                          0.04       8.80 f
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U4661/Y (NOR2_X0P5M_A12TR40)
+                                                          0.09       8.89 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1553/Y (XNOR2_X0P7M_A12TR40)
+                                                          0.08       8.97 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/U1537/Y (AO21B_X1M_A12TR40)
+                                                          0.08       9.04 r
+  fpu_gen.fp_wrapper_i/i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi/result_o[12] (fpnew_fma_multi_10_00000000_1__logic_Z_1yB__790242)
+                                                          0.00       9.04 r
+  U5973/Y (NAND2_X1B_A12TR40)                             0.04       9.08 f
+  U13609/Y (OAI211_X1P4M_A12TR40)                         0.06       9.14 r
+  U13610/Y (AOI211_X1M_A12TR40)                           0.06       9.20 f
+  U13611/Y (AO21B_X1M_A12TR40)                            0.06       9.26 r
+  U5584/Y (INV_X2M_A12TR40)                               0.03       9.29 f
+  U7940/Y (OAI21_X1M_A12TR40)                             0.13       9.42 r
+  core_i/id_stage_i/regfile_wdata_wb_i[12] (cv32e40px_id_stage_COREV_X_IF0_COREV_PULP0_COREV_CLUSTER0_N_HWLP2_PULP_SECURE0_USE_PMP0_A_EXTENSION0_APU1_FPU1_FPU_ADDMUL_LAT0_FPU_OTHERS_LAT0_ZFINX0_APU_NARGS_CPU3_APU_WOP_CPU6_APU_NDSFLAGS_CPU15_APU_NUSFLAGS_CPU5_DEBUG_TRIGGER_EN1)
+                                                          0.00       9.42 r
+  core_i/id_stage_i/U382/Y (AOI222_X1P4M_A12TR40)         0.12       9.54 f
+  core_i/id_stage_i/U622/Y (NOR2_X0P5M_A12TR40)           0.13       9.67 r
+  core_i/id_stage_i/U265/Y (AOI211_X1M_A12TR40)           0.11       9.78 f
+  core_i/id_stage_i/U178/Y (OAI21_X0P5M_A12TR40)          0.13       9.91 r
+  core_i/id_stage_i/apu_operands_ex_o_reg[1][12]/D (DFFRPQ_X0P5M_A12TR40)
+                                                          0.00       9.91 r
+  data arrival time                                                  9.91
+
+  clock clk (rise edge)                                  10.00      10.00
+  clock network delay (ideal)                             0.00      10.00
+  core_i/id_stage_i/apu_operands_ex_o_reg[1][12]/CK (DFFRPQ_X0P5M_A12TR40)
+                                                          0.00      10.00 r
+  library setup time                                     -0.09       9.91
+  data required time                                                 9.91
+  --------------------------------------------------------------------------
+  data required time                                                 9.91
+  data arrival time                                                 -9.91
+  --------------------------------------------------------------------------
+  slack (MET)                                                        0.00
+
+
+1

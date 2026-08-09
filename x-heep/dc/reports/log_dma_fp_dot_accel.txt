@@ -1,0 +1,619 @@
+
+                           Design Compiler Graphical 
+                                 DC Ultra (TM)
+                                  DFTMAX (TM)
+                              Power Compiler (TM)
+                                 DesignWare (R)
+                                 DC Expert (TM)
+                               Design Vision (TM)
+                               HDL Compiler (TM)
+                               VHDL Compiler (TM)
+                                  DFT Compiler
+                               Design Compiler(R)
+
+               Version S-2021.06-SP5 for linux64 - Jan 11, 2022 
+
+                    Copyright (c) 1988 - 2022 Synopsys, Inc.
+   This software and the associated documentation are proprietary to Synopsys,
+ Inc. This software may only be used in accordance with the terms and conditions
+ of a written license agreement with Synopsys, Inc. All other use, reproduction,
+   or distribution of this software is strictly prohibited.  Licensed Products
+     communicate with Synopsys servers for the purpose of providing software
+    updates, detecting software piracy and verifying that customers are using
+    Licensed Products in conformity with the applicable License Key for such
+  Licensed Products. Synopsys will use information gathered in connection with
+    this process to deliver software updates and pursue software pirates and
+                                   infringers.
+
+ Inclusivity & Diversity - Visit SolvNetPlus to read the "Synopsys Statement on
+            Inclusivity and Diversity" (Refer to article 000036315 at
+                        https://solvnetplus.synopsys.com)
+Initializing...
+#=============================================================================
+# Area synthesis of ONE module for the shared-FMA thesis (Design Compiler).
+#
+# Driven per-module by dc/run_area.sh (fresh dc_shell each -> zero state mixing).
+# You normally do NOT run this by hand; use:   bash dc/run_area.sh
+# To run a single module by hand:              TOP=dma_apu_arbiter dc_shell -f dc/synth_area.tcl
+#
+# Edit only LIB_DB below (once). TOP/CLK_NS come from the environment.
+#=============================================================================
+# ----------------------------- USER SETTING ---------------------------------
+set LIB_DB "./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db"
+./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db
+# ----------------------------------------------------------------------------
+set XHEEP  [pwd]
+/2tb/home/oyurtsever/x-heep
+set TOP    [expr {[info exists env(TOP)]    ? $env(TOP)    : "cv32e40px_fp_wrapper"}]
+dma_fp_dot_accel
+set CLK_NS [expr {[info exists env(CLK_NS)] ? $env(CLK_NS) : 10.0}]
+10.0
+# GUARD: never silently fall back to gtech (which reports area = 0).
+if {![file exists $LIB_DB]} {
+    puts "FATAL: standard-cell library not found: $LIB_DB (run from x-heep root, fix LIB_DB)"
+    exit 1
+}
+# Per-TOP: filelist, analyze defines, elaborate params
+set FLIST   "dc/rtl_core.f"
+dc/rtl_core.f
+set DEFINES {SYNTHESIS}
+SYNTHESIS
+set PARAMS  ""
+switch $TOP {
+    dma_fp_dot_accel     { set FLIST "dc/rtl_accel.f" }
+    cv32e40px_fp_wrapper { }
+    dma_apu_arbiter      { }
+    cv32e40px_top        { set DEFINES {SYNTHESIS COPROC_FPU_SHARE}; set PARAMS "FPU=1" }
+    default              { }
+}
+dc/rtl_accel.f
+# ------------------------------- library ------------------------------------
+set target_library    $LIB_DB
+./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db
+set synthetic_library "dw_foundation.sldb"
+dw_foundation.sldb
+set link_library      [concat "*" $LIB_DB $synthetic_library]
+* ./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db dw_foundation.sldb
+define_design_lib WORK -path ./dc/work/$TOP          ;# per-TOP work dir -> no clash
+1
+set search_path [concat $search_path \
+    $XHEEP/hw/vendor/pulp_platform/common_cells/include \
+    $XHEEP/hw/vendor/pulp_platform/register_interface/include ]
+. /eda/synopsys/syn/S-2021.06-SP5/libraries/syn /eda/synopsys/syn/S-2021.06-SP5/dw/syn_ver /eda/synopsys/syn/S-2021.06-SP5/dw/sim_ver /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/register_interface/include
+file mkdir dc/reports
+# ------------------------------ read RTL ------------------------------------
+set fh [open $XHEEP/$FLIST r]
+file14
+set files {}
+foreach line [split [read $fh] "\n"] {
+    set line [string trim $line]
+    if {$line ne "" && ![string match "#*" $line]} { lappend files $XHEEP/$line }
+}
+close $fh
+analyze -format sverilog -define $DEFINES $files
+Running PRESTO HDLC
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/core-v-mini-mcu/include/fifo_pkg.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/tb/dma_fp_dot_accel.sv
+Presto compilation completed successfully.
+Loading db file '/2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db'
+Loading db file '/eda/synopsys/syn/S-2021.06-SP5/libraries/syn/dw_foundation.sldb'
+1
+if {$PARAMS ne ""} { elaborate $TOP -parameters $PARAMS } else { elaborate $TOP }
+Loading db file '/eda/synopsys/syn/S-2021.06-SP5/libraries/syn/gtech.db'
+Loading db file '/eda/synopsys/syn/S-2021.06-SP5/libraries/syn/standard.sldb'
+  Loading link library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c'
+  Loading link library 'gtech'
+Running PRESTO HDLC
+
+Statistics for case statements in always block at line 61 in file
+	'/2tb/home/oyurtsever/x-heep/tb/dma_fp_dot_accel.sv'
+===============================================
+|           Line           |  full/ parallel  |
+===============================================
+|            67            |    auto/auto     |
+===============================================
+
+Inferred memory devices in process
+	in routine dma_fp_dot_accel line 61 in file
+		'/2tb/home/oyurtsever/x-heep/tb/dma_fp_dot_accel.sv'.
+===============================================================================
+|    Register Name    |   Type    | Width | Bus | MB | AR | AS | SR | SS | ST |
+===============================================================================
+|      cnt_q_reg      | Flip-flop |  16   |  Y  | N  | Y  | N  | N  | N  | N  |
+|     state_q_reg     | Flip-flop |   3   |  Y  | N  | Y  | N  | N  | N  | N  |
+|      acc_q_reg      | Flip-flop |  32   |  Y  | N  | Y  | N  | N  | N  | N  |
+|       a_q_reg       | Flip-flop |  32   |  Y  | N  | Y  | N  | N  | N  | N  |
+|       b_q_reg       | Flip-flop |  32   |  Y  | N  | Y  | N  | N  | N  | N  |
+===============================================================================
+Presto compilation completed successfully. (dma_fp_dot_accel)
+Elaborated 1 design.
+Current design is now 'dma_fp_dot_accel'.
+1
+current_design $TOP
+Current design is 'dma_fp_dot_accel'.
+{dma_fp_dot_accel}
+link
+
+  Linking design 'dma_fp_dot_accel'
+  Using the following designs and libraries:
+  --------------------------------------------------------------------------
+  dma_fp_dot_accel            /2tb/home/oyurtsever/x-heep/dma_fp_dot_accel.db
+  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c (library) /2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db
+  dw_foundation.sldb (library) /eda/synopsys/syn/S-2021.06-SP5/libraries/syn/dw_foundation.sldb
+
+1
+check_design
+ 
+****************************************
+check_design summary:
+Version:     S-2021.06-SP5
+Date:        Sun Jul  5 15:21:56 2026
+****************************************
+
+                   Name                                            Total
+--------------------------------------------------------------------------------
+Inputs/Outputs                                                     79
+    Unconnected ports (LINT-28)                                     5
+    Shorted outputs (LINT-31)                                      53
+    Constant outputs (LINT-52)                                     21
+
+Cells                                                               2
+    Cells do not drive (LINT-1)                                     2
+--------------------------------------------------------------------------------
+
+Warning: In design 'dma_fp_dot_accel', cell 'C1317' does not drive any nets. (LINT-1)
+Warning: In design 'dma_fp_dot_accel', cell 'C1322' does not drive any nets. (LINT-1)
+Warning: In design 'dma_fp_dot_accel', port 'fpu_rflags_i[4]' is not connected to any nets. (LINT-28)
+Warning: In design 'dma_fp_dot_accel', port 'fpu_rflags_i[3]' is not connected to any nets. (LINT-28)
+Warning: In design 'dma_fp_dot_accel', port 'fpu_rflags_i[2]' is not connected to any nets. (LINT-28)
+Warning: In design 'dma_fp_dot_accel', port 'fpu_rflags_i[1]' is not connected to any nets. (LINT-28)
+Warning: In design 'dma_fp_dot_accel', port 'fpu_rflags_i[0]' is not connected to any nets. (LINT-28)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[full]' is connected directly to output port 'hw_fifo_resp_o[alm_full]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][31]' is connected directly to output port 'fpu_operands_o[2][31]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][30]' is connected directly to output port 'fpu_operands_o[2][30]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][29]' is connected directly to output port 'fpu_operands_o[2][29]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][28]' is connected directly to output port 'fpu_operands_o[2][28]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][27]' is connected directly to output port 'fpu_operands_o[2][27]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][26]' is connected directly to output port 'fpu_operands_o[2][26]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][25]' is connected directly to output port 'fpu_operands_o[2][25]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][24]' is connected directly to output port 'fpu_operands_o[2][24]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][23]' is connected directly to output port 'fpu_operands_o[2][23]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][22]' is connected directly to output port 'fpu_operands_o[2][22]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][21]' is connected directly to output port 'fpu_operands_o[2][21]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][20]' is connected directly to output port 'fpu_operands_o[2][20]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][19]' is connected directly to output port 'fpu_operands_o[2][19]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][18]' is connected directly to output port 'fpu_operands_o[2][18]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][17]' is connected directly to output port 'fpu_operands_o[2][17]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][16]' is connected directly to output port 'fpu_operands_o[2][16]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][15]' is connected directly to output port 'fpu_operands_o[2][15]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][14]' is connected directly to output port 'fpu_operands_o[2][14]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][13]' is connected directly to output port 'fpu_operands_o[2][13]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][12]' is connected directly to output port 'fpu_operands_o[2][12]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][11]' is connected directly to output port 'fpu_operands_o[2][11]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][10]' is connected directly to output port 'fpu_operands_o[2][10]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][9]' is connected directly to output port 'fpu_operands_o[2][9]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][8]' is connected directly to output port 'fpu_operands_o[2][8]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][7]' is connected directly to output port 'fpu_operands_o[2][7]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][6]' is connected directly to output port 'fpu_operands_o[2][6]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][5]' is connected directly to output port 'fpu_operands_o[2][5]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][4]' is connected directly to output port 'fpu_operands_o[2][4]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][3]' is connected directly to output port 'fpu_operands_o[2][3]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][2]' is connected directly to output port 'fpu_operands_o[2][2]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][1]' is connected directly to output port 'fpu_operands_o[2][1]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'hw_fifo_resp_o[data][0]' is connected directly to output port 'fpu_operands_o[2][0]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[0]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[1]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[2]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[3]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[4]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[5]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[6]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[7]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[8]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[9]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[10]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[11]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[12]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[13]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_flags_o[14]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_op_o[0]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_op_o[1]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_op_o[2]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_op_o[3]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to output port 'fpu_op_o[4]'. (LINT-31)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[5]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[4]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[3]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[2]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[1]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_op_o[0]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[14]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[13]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[12]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[11]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[10]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[9]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[8]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[7]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[6]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[5]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[4]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[3]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[2]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[1]' is connected directly to 'logic 0'. (LINT-52)
+Warning: In design 'dma_fp_dot_accel', output port 'fpu_flags_o[0]' is connected directly to 'logic 0'. (LINT-52)
+1
+uniquify
+1
+# ----------------------------- constraints ----------------------------------
+create_clock -name clk -period $CLK_NS [get_ports clk_i]
+1
+set_max_area 0
+1
+# ----------------------------- synthesize -----------------------------------
+compile_ultra
+Information: Performing power optimization. (PWR-850)
+Alib files are up-to-date.
+Information: Evaluating DesignWare library utilization. (UISN-27)
+
+============================================================================
+| DesignWare Building Block Library  |         Version         | Available |
+============================================================================
+| Basic DW Building Blocks           | S-2021.06-DWBB_202106.5 |     *     |
+| Licensed DW Building Blocks        | S-2021.06-DWBB_202106.5 |     *     |
+============================================================================
+
+============================================================================
+| Flow Information                                                         |
+----------------------------------------------------------------------------
+| Flow         | Design Compiler WLM                                       |
+============================================================================
+| Design Information                                      | Value          |
+============================================================================
+| Number of Scenarios                                     | 0              |
+| Leaf Cell Count                                         | 194            |
+| Number of User Hierarchies                              | 0              |
+| Sequential Cell Count                                   | 115            |
+| Macro Count                                             | 0              |
+| Number of Power Domains                                 | 0              |
+| Design with UPF Data                                    | false          |
+============================================================================
+Information: Sequential output inversion is enabled.  SVF file must be used for formal verification. (OPT-1208)
+
+Information: There are 81 potential problems in your design. Please run 'check_design' for more information. (LINT-99)
+
+  Simplifying Design 'dma_fp_dot_accel'
+
+Loaded alib file './alib-52/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db.alib'
+  Building model 'DW01_NAND2'
+Information: Ungrouping 0 of 1 hierarchies before Pass 1 (OPT-775)
+Information: State dependent leakage is now switched from on to off.
+
+  Beginning Pass 1 Mapping
+  ------------------------
+  Processing 'dma_fp_dot_accel'
+ Implement Synthetic for 'dma_fp_dot_accel'.
+
+  Updating timing information
+Information: Updating design information... (UID-85)
+Information: The library cell 'TIELO_X1M_A12TR40' in the library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c' is not characterized for internal power. (PWR-536)
+Information: The library cell 'TIEHI_X1M_A12TR40' in the library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c' is not characterized for internal power. (PWR-536)
+Information: The target library(s) contains cell(s), other than black boxes, that are not characterized for internal power. (PWR-24)
+
+  Beginning Mapping Optimizations  (Ultra High effort)
+  -------------------------------
+Information: Added key list 'DesignWare' to design 'dma_fp_dot_accel'. (DDB-72)
+Information: There is no timing violation in design dma_fp_dot_accel. Delay-based auto_ungroup will not be performed. (OPT-780)
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:06    1376.4      0.00       0.0       0.0                             34.8302
+    0:00:06    1375.1      0.00       0.0       0.0                             34.8225
+
+  Beginning Constant Register Removal
+  -----------------------------------
+    0:00:06    1375.1      0.00       0.0       0.0                             34.8225
+    0:00:06    1375.1      0.00       0.0       0.0                             34.8225
+
+  Beginning Global Optimizations
+  ------------------------------
+  Numerical Synthesis (Phase 1)
+  Numerical Synthesis (Phase 2)
+  Global Optimization (Phase 1)
+  Global Optimization (Phase 2)
+  Global Optimization (Phase 3)
+  Global Optimization (Phase 4)
+  Global Optimization (Phase 5)
+  Global Optimization (Phase 6)
+  Global Optimization (Phase 7)
+  Global Optimization (Phase 8)
+  Global Optimization (Phase 9)
+  Global Optimization (Phase 10)
+  Global Optimization (Phase 11)
+  Global Optimization (Phase 12)
+  Global Optimization (Phase 13)
+  Global Optimization (Phase 14)
+  Global Optimization (Phase 15)
+  Global Optimization (Phase 16)
+  Global Optimization (Phase 17)
+  Global Optimization (Phase 18)
+  Global Optimization (Phase 19)
+  Global Optimization (Phase 20)
+  Global Optimization (Phase 21)
+  Global Optimization (Phase 22)
+  Global Optimization (Phase 23)
+  Global Optimization (Phase 24)
+  Global Optimization (Phase 25)
+  Global Optimization (Phase 26)
+  Global Optimization (Phase 27)
+  Global Optimization (Phase 28)
+  Global Optimization (Phase 29)
+  Global Optimization (Phase 30)
+
+  Beginning Isolate Ports
+  -----------------------
+
+  Beginning Delay Optimization
+  ----------------------------
+    0:00:07    1052.7      0.00       0.0      22.4                             11.5130
+    0:00:07    1052.7      0.00       0.0      22.4                             11.5130
+    0:00:07    1052.7      0.00       0.0      22.4                             11.5130
+    0:00:07    1052.7      0.00       0.0      22.4                             11.5130
+    0:00:07    1051.8      0.00       0.0      22.4                             11.5112
+    0:00:07    1051.8      0.00       0.0      22.4                             11.5112
+
+  Beginning WLM Backend Optimization
+  --------------------------------------
+    0:00:07    1052.7      0.00       0.0      22.4                             11.4018
+    0:00:07    1052.7      0.00       0.0      22.4                             11.4018
+    0:00:07    1052.7      0.00       0.0      22.4                             11.4018
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:07    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2824
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2824
+
+
+  Beginning Leakage Power Optimization  (max_leakage_power 0)
+  ------------------------------------
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2824
+  Global Optimization (Phase 31)
+  Global Optimization (Phase 32)
+  Global Optimization (Phase 33)
+  Global Optimization (Phase 34)
+  Global Optimization (Phase 35)
+  Global Optimization (Phase 36)
+  Global Optimization (Phase 37)
+  Global Optimization (Phase 38)
+  Global Optimization (Phase 39)
+  Global Optimization (Phase 40)
+  Global Optimization (Phase 41)
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:08    1052.7      0.00       0.0       0.0                              7.2370
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2655
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2655
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2655
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:08    1051.4      0.00       0.0       0.0                              7.2570
+Loading db file '/2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db'
+
+
+Note: Symbol # after min delay cost means estimated hold TNS across all active scenarios 
+
+
+  Optimization Complete
+  ---------------------
+Information: State dependent leakage is now switched from off to on.
+Information: Propagating switching activity (low effort zero delay simulation). (PWR-6)
+1
+compile_ultra -incremental
+Information: Performing power optimization. (PWR-850)
+Alib files are up-to-date.
+============================================================================
+| Flow Information                                                         |
+----------------------------------------------------------------------------
+| Flow         | Design Compiler                                           |
+============================================================================
+| Design Information                                      | Value          |
+============================================================================
+| Number of Scenarios                                     | 0              |
+| Leaf Cell Count                                         | 424            |
+| Number of User Hierarchies                              | 0              |
+| Sequential Cell Count                                   | 115            |
+| Macro Count                                             | 0              |
+| Number of Power Domains                                 | 0              |
+| Design with UPF Data                                    | false          |
+============================================================================
+
+Information: There are 79 potential problems in your design. Please run 'check_design' for more information. (LINT-99)
+
+
+Information: State dependent leakage is now switched from on to off.
+
+  Beginning Pass 1 Mapping  (Incremental)
+  ------------------------
+
+  Updating timing information
+Information: Updating design information... (UID-85)
+Information: The library cell 'TIELO_X1M_A12TR40' in the library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c' is not characterized for internal power. (PWR-536)
+Information: The library cell 'TIEHI_X1M_A12TR40' in the library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c' is not characterized for internal power. (PWR-536)
+Information: The target library(s) contains cell(s), other than black boxes, that are not characterized for internal power. (PWR-24)
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:02    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:02    1051.4      0.00       0.0       0.0                              7.2570
+
+  Beginning Mapping Optimizations  (Ultra High effort)  (Incremental)
+  -------------------------------
+
+  Beginning Incremental Implementation Selection
+  ----------------------------------------------
+    0:00:02    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:02    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:02    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:02    1051.4      0.00       0.0       0.0                              7.2570
+  Global Optimization (Phase 42)
+  Global Optimization (Phase 43)
+  Global Optimization (Phase 44)
+  Global Optimization (Phase 45)
+
+
+
+  Beginning Delay Optimization Phase
+  ----------------------------------
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:02    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:02    1051.4      0.00       0.0       0.0                              7.2570
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+
+  Beginning Delay Optimization
+  ----------------------------
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+
+
+  Beginning Leakage Power Optimization  (max_leakage_power 0)
+  ------------------------------------
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:03    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:04    1051.4      0.00       0.0       0.0                              7.2226
+    0:00:04    1051.4      0.00       0.0       0.0                              7.2165
+    0:00:04    1051.4      0.00       0.0       0.0                              7.2165
+    0:00:04    1051.4      0.00       0.0       0.0                              7.2165
+    0:00:04    1051.4      0.00       0.0       0.0                              7.2165
+Loading db file '/2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db'
+
+
+Note: Symbol # after min delay cost means estimated hold TNS across all active scenarios 
+
+
+  Optimization Complete
+  ---------------------
+Information: State dependent leakage is now switched from off to on.
+Information: Propagating switching activity (low effort zero delay simulation). (PWR-6)
+1
+# ------------------------------- reports ------------------------------------
+report_area -hierarchy > dc/reports/area_${TOP}_hier.rpt
+report_area            > dc/reports/area_${TOP}.rpt
+report_reference       > dc/reports/refs_${TOP}.rpt
+report_timing          > dc/reports/timing_${TOP}.rpt
+set A [get_attribute [current_design] area]
+Current design is 'dma_fp_dot_accel'.
+Warning: Attribute 'area' does not exist on design 'dma_fp_dot_accel'. (UID-101)
+set F [sizeof_collection [all_registers]]
+115
+# GUARD: 0 area means unmapped (library not applied) -> shout, don't fail silently.
+if {$A == 0} {
+    puts "!!!!!! $TOP : area = 0  -> design UNMAPPED (check library). See log. !!!!!!"
+} else {
+    puts "==== $TOP : Total cell area = $A , FFs = $F ===="
+}
+==== dma_fp_dot_accel : Total cell area =  , FFs = 115 ====
+exit
+
+Memory usage for this session 369 Mbytes.
+Memory usage for this session including child processes 369 Mbytes.
+CPU usage for this session 23 seconds ( 0.01 hours ).
+Elapsed time for this session 24 seconds ( 0.01 hours ).
+
+Thank you...

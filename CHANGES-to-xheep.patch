@@ -1,0 +1,1463 @@
+diff --git a/Makefile b/Makefile
+index b6746f7..3bec226 100644
+--- a/Makefile
++++ b/Makefile
+@@ -216,6 +216,12 @@ app-list:
+ verilator-build: | .check-verilator
+ 	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --build openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
+ 
++mine-mcu-gen:
++	$(MAKE) mcu-gen X_HEEP_CFG=configs/cv32e40px_fpu_dma.hjson
++
++all-build-run:
++	$(MAKE) verilator-build && $(MAKE) app PROJECT=$(PROJECT) ARCH=rv32imfc_zicsr && $(MAKE) verilator-run 
++
+ ## Verilator simulation with SystemC
+ verilator-build-sc: | .check-verilator
+ 	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --no-export --target=sim_sc --tool=verilator $(FUSESOC_FLAGS) --build openhwgroup.org:systems:core-v-mini-mcu $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
+diff --git a/core-v-mini-mcu.core b/core-v-mini-mcu.core
+index 47c773b..1650f2e 100644
+--- a/core-v-mini-mcu.core
++++ b/core-v-mini-mcu.core
+@@ -386,6 +386,7 @@ targets:
+           - '--trace-max-array 1024'
+           - '--x-assign unique'
+           - '--x-initial unique'
++          - '+define+COPROC_FPU_SHARE'
+           - '--exe tb_top.cpp'
+           - '-CFLAGS "-Wall -fpermissive"'
+           - '-LDFLAGS "-pthread -lutil -lelf"'
+diff --git a/hw/core-v-mini-mcu/core_v_mini_mcu.sv b/hw/core-v-mini-mcu/core_v_mini_mcu.sv
+index 80c3097..e527ac9 100644
+--- a/hw/core-v-mini-mcu/core_v_mini_mcu.sv
++++ b/hw/core-v-mini-mcu/core_v_mini_mcu.sv
+@@ -22,214 +22,214 @@ module core_v_mini_mcu
+     parameter EXT_HARTS_RND = EXT_HARTS == 0 ? 1 : EXT_HARTS
+ ) (
+ 
+-    input  logic rst_ni,
+-    input  logic clk_i,
+-    input  logic boot_select_i,
+-    input  logic execute_from_flash_i,
+-    input  logic jtag_tck_i,
+-    input  logic jtag_tms_i,
+-    input  logic jtag_trst_ni,
+-    input  logic jtag_tdi_i,
+-    output logic jtag_tdo_o,
+-    input  logic uart_rx_i,
+-    output logic uart_tx_o,
+-    output logic exit_valid_o,
+-    input  logic ddr_rcv_clk_i,
+-    output logic ddr_snd_clk_o,
+-    input  logic gpio_0_i,
+-    output logic gpio_0_o,
+-    output logic gpio_0_oe_o,
+-    input  logic gpio_1_i,
+-    output logic gpio_1_o,
+-    output logic gpio_1_oe_o,
+-    input  logic ddr_rcv_0_i,
+-    input  logic gpio_2_i,
+-    output logic gpio_2_o,
+-    output logic gpio_2_oe_o,
+-    input  logic ddr_rcv_1_i,
+-    input  logic gpio_3_i,
+-    output logic gpio_3_o,
+-    output logic gpio_3_oe_o,
+-    input  logic ddr_rcv_2_i,
+-    input  logic gpio_4_i,
+-    output logic gpio_4_o,
+-    output logic gpio_4_oe_o,
+-    input  logic gpio_5_i,
+-    output logic gpio_5_o,
+-    output logic gpio_5_oe_o,
+-    input  logic gpio_6_i,
+-    output logic gpio_6_o,
+-    output logic gpio_6_oe_o,
+-    input  logic ddr_rcv_3_i,
+-    input  logic gpio_7_i,
+-    output logic gpio_7_o,
+-    output logic gpio_7_oe_o,
+-    output logic ddr_snd_0_o,
+-    input  logic gpio_8_i,
+-    output logic gpio_8_o,
+-    output logic gpio_8_oe_o,
+-    output logic ddr_snd_1_o,
+-    input  logic gpio_9_i,
+-    output logic gpio_9_o,
+-    output logic gpio_9_oe_o,
+-    output logic ddr_snd_2_o,
+-    input  logic gpio_10_i,
+-    output logic gpio_10_o,
+-    output logic gpio_10_oe_o,
+-    output logic ddr_snd_3_o,
+-    input  logic gpio_11_i,
+-    output logic gpio_11_o,
+-    output logic gpio_11_oe_o,
+-    input  logic gpio_12_i,
+-    output logic gpio_12_o,
+-    output logic gpio_12_oe_o,
+-    input  logic gpio_13_i,
+-    output logic gpio_13_o,
+-    output logic gpio_13_oe_o,
+-    input  logic spi_flash_sck_i,
+-    output logic spi_flash_sck_o,
+-    output logic spi_flash_sck_oe_o,
+-    input  logic spi_flash_cs_0_i,
+-    output logic spi_flash_cs_0_o,
+-    output logic spi_flash_cs_0_oe_o,
+-    input  logic spi_flash_cs_1_i,
+-    output logic spi_flash_cs_1_o,
+-    output logic spi_flash_cs_1_oe_o,
+-    input  logic spi_flash_sd_0_i,
+-    output logic spi_flash_sd_0_o,
+-    output logic spi_flash_sd_0_oe_o,
+-    input  logic spi_flash_sd_1_i,
+-    output logic spi_flash_sd_1_o,
+-    output logic spi_flash_sd_1_oe_o,
+-    input  logic spi_flash_sd_2_i,
+-    output logic spi_flash_sd_2_o,
+-    output logic spi_flash_sd_2_oe_o,
+-    input  logic spi_flash_sd_3_i,
+-    output logic spi_flash_sd_3_o,
+-    output logic spi_flash_sd_3_oe_o,
+-    input  logic spi_sck_i,
+-    output logic spi_sck_o,
+-    output logic spi_sck_oe_o,
+-    input  logic spi_cs_0_i,
+-    output logic spi_cs_0_o,
+-    output logic spi_cs_0_oe_o,
+-    input  logic spi_cs_1_i,
+-    output logic spi_cs_1_o,
+-    output logic spi_cs_1_oe_o,
+-    input  logic spi_sd_0_i,
+-    output logic spi_sd_0_o,
+-    output logic spi_sd_0_oe_o,
+-    input  logic spi_sd_1_i,
+-    output logic spi_sd_1_o,
+-    output logic spi_sd_1_oe_o,
+-    input  logic spi_sd_2_i,
+-    output logic spi_sd_2_o,
+-    output logic spi_sd_2_oe_o,
+-    input  logic spi_sd_3_i,
+-    output logic spi_sd_3_o,
+-    output logic spi_sd_3_oe_o,
+-    input  logic spi_slave_sck_i,
+-    input  logic gpio_14_i,
+-    output logic gpio_14_o,
+-    output logic gpio_14_oe_o,
+-    input  logic spi_slave_cs_i,
+-    input  logic gpio_15_i,
+-    output logic gpio_15_o,
+-    output logic gpio_15_oe_o,
+-    input  logic spi_slave_miso_i,
+-    output logic spi_slave_miso_o,
+-    output logic spi_slave_miso_oe_o,
+-    input  logic gpio_16_i,
+-    output logic gpio_16_o,
+-    output logic gpio_16_oe_o,
+-    input  logic spi_slave_mosi_i,
+-    input  logic gpio_17_i,
+-    output logic gpio_17_o,
+-    output logic gpio_17_oe_o,
+-    input  logic pdm2pcm_pdm_i,
+-    output logic pdm2pcm_pdm_o,
+-    output logic pdm2pcm_pdm_oe_o,
+-    input  logic gpio_18_i,
+-    output logic gpio_18_o,
+-    output logic gpio_18_oe_o,
+-    input  logic pdm2pcm_clk_i,
+-    output logic pdm2pcm_clk_o,
+-    output logic pdm2pcm_clk_oe_o,
+-    input  logic gpio_19_i,
+-    output logic gpio_19_o,
+-    output logic gpio_19_oe_o,
+-    input  logic i2s_sck_i,
+-    output logic i2s_sck_o,
+-    output logic i2s_sck_oe_o,
+-    input  logic gpio_20_i,
+-    output logic gpio_20_o,
+-    output logic gpio_20_oe_o,
+-    input  logic i2s_ws_i,
+-    output logic i2s_ws_o,
+-    output logic i2s_ws_oe_o,
+-    input  logic gpio_21_i,
+-    output logic gpio_21_o,
+-    output logic gpio_21_oe_o,
+-    input  logic i2s_sd_i,
+-    output logic i2s_sd_o,
+-    output logic i2s_sd_oe_o,
+-    input  logic gpio_22_i,
+-    output logic gpio_22_o,
+-    output logic gpio_22_oe_o,
+-    input  logic spi2_cs_0_i,
+-    output logic spi2_cs_0_o,
+-    output logic spi2_cs_0_oe_o,
+-    input  logic gpio_23_i,
+-    output logic gpio_23_o,
+-    output logic gpio_23_oe_o,
+-    input  logic spi2_cs_1_i,
+-    output logic spi2_cs_1_o,
+-    output logic spi2_cs_1_oe_o,
+-    input  logic gpio_24_i,
+-    output logic gpio_24_o,
+-    output logic gpio_24_oe_o,
+-    input  logic spi2_sck_i,
+-    output logic spi2_sck_o,
+-    output logic spi2_sck_oe_o,
+-    input  logic gpio_25_i,
+-    output logic gpio_25_o,
+-    output logic gpio_25_oe_o,
+-    input  logic spi2_sd_0_i,
+-    output logic spi2_sd_0_o,
+-    output logic spi2_sd_0_oe_o,
+-    input  logic gpio_26_i,
+-    output logic gpio_26_o,
+-    output logic gpio_26_oe_o,
+-    input  logic spi2_sd_1_i,
+-    output logic spi2_sd_1_o,
+-    output logic spi2_sd_1_oe_o,
+-    input  logic gpio_27_i,
+-    output logic gpio_27_o,
+-    output logic gpio_27_oe_o,
+-    input  logic spi2_sd_2_i,
+-    output logic spi2_sd_2_o,
+-    output logic spi2_sd_2_oe_o,
+-    input  logic gpio_28_i,
+-    output logic gpio_28_o,
+-    output logic gpio_28_oe_o,
+-    input  logic spi2_sd_3_i,
+-    output logic spi2_sd_3_o,
+-    output logic spi2_sd_3_oe_o,
+-    input  logic gpio_29_i,
+-    output logic gpio_29_o,
+-    output logic gpio_29_oe_o,
+-    input  logic i2c_scl_i,
+-    output logic i2c_scl_o,
+-    output logic i2c_scl_oe_o,
+-    input  logic gpio_31_i,
+-    output logic gpio_31_o,
+-    output logic gpio_31_oe_o,
+-    input  logic i2c_sda_i,
+-    output logic i2c_sda_o,
+-    output logic i2c_sda_oe_o,
+-    input  logic gpio_30_i,
+-    output logic gpio_30_o,
+-    output logic gpio_30_oe_o,
++      input logic rst_ni,
++          input logic clk_i,
++          input logic boot_select_i,
++          input logic execute_from_flash_i,
++          input logic jtag_tck_i,
++          input logic jtag_tms_i,
++          input logic jtag_trst_ni,
++          input logic jtag_tdi_i,
++          output logic jtag_tdo_o,
++          input logic uart_rx_i,
++          output logic uart_tx_o,
++          output logic exit_valid_o,
++          input logic ddr_rcv_clk_i,
++          output logic ddr_snd_clk_o,
++          input logic gpio_0_i,
++          output logic gpio_0_o,
++          output logic gpio_0_oe_o,
++          input logic gpio_1_i,
++          output logic gpio_1_o,
++          output logic gpio_1_oe_o,
++          input logic ddr_rcv_0_i,
++          input logic gpio_2_i,
++          output logic gpio_2_o,
++          output logic gpio_2_oe_o,
++          input logic ddr_rcv_1_i,
++          input logic gpio_3_i,
++          output logic gpio_3_o,
++          output logic gpio_3_oe_o,
++          input logic ddr_rcv_2_i,
++          input logic gpio_4_i,
++          output logic gpio_4_o,
++          output logic gpio_4_oe_o,
++          input logic gpio_5_i,
++          output logic gpio_5_o,
++          output logic gpio_5_oe_o,
++          input logic gpio_6_i,
++          output logic gpio_6_o,
++          output logic gpio_6_oe_o,
++          input logic ddr_rcv_3_i,
++          input logic gpio_7_i,
++          output logic gpio_7_o,
++          output logic gpio_7_oe_o,
++          output logic ddr_snd_0_o,
++          input logic gpio_8_i,
++          output logic gpio_8_o,
++          output logic gpio_8_oe_o,
++          output logic ddr_snd_1_o,
++          input logic gpio_9_i,
++          output logic gpio_9_o,
++          output logic gpio_9_oe_o,
++          output logic ddr_snd_2_o,
++          input logic gpio_10_i,
++          output logic gpio_10_o,
++          output logic gpio_10_oe_o,
++          output logic ddr_snd_3_o,
++          input logic gpio_11_i,
++          output logic gpio_11_o,
++          output logic gpio_11_oe_o,
++          input logic gpio_12_i,
++          output logic gpio_12_o,
++          output logic gpio_12_oe_o,
++          input logic gpio_13_i,
++          output logic gpio_13_o,
++          output logic gpio_13_oe_o,
++          input logic spi_flash_sck_i,
++          output logic spi_flash_sck_o,
++          output logic spi_flash_sck_oe_o,
++          input logic spi_flash_cs_0_i,
++          output logic spi_flash_cs_0_o,
++          output logic spi_flash_cs_0_oe_o,
++          input logic spi_flash_cs_1_i,
++          output logic spi_flash_cs_1_o,
++          output logic spi_flash_cs_1_oe_o,
++          input logic spi_flash_sd_0_i,
++          output logic spi_flash_sd_0_o,
++          output logic spi_flash_sd_0_oe_o,
++          input logic spi_flash_sd_1_i,
++          output logic spi_flash_sd_1_o,
++          output logic spi_flash_sd_1_oe_o,
++          input logic spi_flash_sd_2_i,
++          output logic spi_flash_sd_2_o,
++          output logic spi_flash_sd_2_oe_o,
++          input logic spi_flash_sd_3_i,
++          output logic spi_flash_sd_3_o,
++          output logic spi_flash_sd_3_oe_o,
++          input logic spi_sck_i,
++          output logic spi_sck_o,
++          output logic spi_sck_oe_o,
++          input logic spi_cs_0_i,
++          output logic spi_cs_0_o,
++          output logic spi_cs_0_oe_o,
++          input logic spi_cs_1_i,
++          output logic spi_cs_1_o,
++          output logic spi_cs_1_oe_o,
++          input logic spi_sd_0_i,
++          output logic spi_sd_0_o,
++          output logic spi_sd_0_oe_o,
++          input logic spi_sd_1_i,
++          output logic spi_sd_1_o,
++          output logic spi_sd_1_oe_o,
++          input logic spi_sd_2_i,
++          output logic spi_sd_2_o,
++          output logic spi_sd_2_oe_o,
++          input logic spi_sd_3_i,
++          output logic spi_sd_3_o,
++          output logic spi_sd_3_oe_o,
++          input logic spi_slave_sck_i,
++          input logic gpio_14_i,
++          output logic gpio_14_o,
++          output logic gpio_14_oe_o,
++          input logic spi_slave_cs_i,
++          input logic gpio_15_i,
++          output logic gpio_15_o,
++          output logic gpio_15_oe_o,
++          input logic spi_slave_miso_i,
++          output logic spi_slave_miso_o,
++          output logic spi_slave_miso_oe_o,
++          input logic gpio_16_i,
++          output logic gpio_16_o,
++          output logic gpio_16_oe_o,
++          input logic spi_slave_mosi_i,
++          input logic gpio_17_i,
++          output logic gpio_17_o,
++          output logic gpio_17_oe_o,
++          input logic pdm2pcm_pdm_i,
++          output logic pdm2pcm_pdm_o,
++          output logic pdm2pcm_pdm_oe_o,
++          input logic gpio_18_i,
++          output logic gpio_18_o,
++          output logic gpio_18_oe_o,
++          input logic pdm2pcm_clk_i,
++          output logic pdm2pcm_clk_o,
++          output logic pdm2pcm_clk_oe_o,
++          input logic gpio_19_i,
++          output logic gpio_19_o,
++          output logic gpio_19_oe_o,
++          input logic i2s_sck_i,
++          output logic i2s_sck_o,
++          output logic i2s_sck_oe_o,
++          input logic gpio_20_i,
++          output logic gpio_20_o,
++          output logic gpio_20_oe_o,
++          input logic i2s_ws_i,
++          output logic i2s_ws_o,
++          output logic i2s_ws_oe_o,
++          input logic gpio_21_i,
++          output logic gpio_21_o,
++          output logic gpio_21_oe_o,
++          input logic i2s_sd_i,
++          output logic i2s_sd_o,
++          output logic i2s_sd_oe_o,
++          input logic gpio_22_i,
++          output logic gpio_22_o,
++          output logic gpio_22_oe_o,
++          input logic spi2_cs_0_i,
++          output logic spi2_cs_0_o,
++          output logic spi2_cs_0_oe_o,
++          input logic gpio_23_i,
++          output logic gpio_23_o,
++          output logic gpio_23_oe_o,
++          input logic spi2_cs_1_i,
++          output logic spi2_cs_1_o,
++          output logic spi2_cs_1_oe_o,
++          input logic gpio_24_i,
++          output logic gpio_24_o,
++          output logic gpio_24_oe_o,
++          input logic spi2_sck_i,
++          output logic spi2_sck_o,
++          output logic spi2_sck_oe_o,
++          input logic gpio_25_i,
++          output logic gpio_25_o,
++          output logic gpio_25_oe_o,
++          input logic spi2_sd_0_i,
++          output logic spi2_sd_0_o,
++          output logic spi2_sd_0_oe_o,
++          input logic gpio_26_i,
++          output logic gpio_26_o,
++          output logic gpio_26_oe_o,
++          input logic spi2_sd_1_i,
++          output logic spi2_sd_1_o,
++          output logic spi2_sd_1_oe_o,
++          input logic gpio_27_i,
++          output logic gpio_27_o,
++          output logic gpio_27_oe_o,
++          input logic spi2_sd_2_i,
++          output logic spi2_sd_2_o,
++          output logic spi2_sd_2_oe_o,
++          input logic gpio_28_i,
++          output logic gpio_28_o,
++          output logic gpio_28_oe_o,
++          input logic spi2_sd_3_i,
++          output logic spi2_sd_3_o,
++          output logic spi2_sd_3_oe_o,
++          input logic gpio_29_i,
++          output logic gpio_29_o,
++          output logic gpio_29_oe_o,
++          input logic i2c_scl_i,
++          output logic i2c_scl_o,
++          output logic i2c_scl_oe_o,
++          input logic gpio_31_i,
++          output logic gpio_31_o,
++          output logic gpio_31_oe_o,
++          input logic i2c_sda_i,
++          output logic i2c_sda_o,
++          output logic i2c_sda_oe_o,
++          input logic gpio_30_i,
++          output logic gpio_30_o,
++          output logic gpio_30_oe_o,
+ 
+     // IDs
+     input logic [31:0] hart_id_i,
+@@ -249,25 +249,25 @@ module core_v_mini_mcu
+     input  obi_req_t  [EXT_XBAR_NMASTER_RND-1:0] ext_xbar_master_req_i,
+     output obi_resp_t [EXT_XBAR_NMASTER_RND-1:0] ext_xbar_master_resp_o,
+ 
+-    input  reg_req_t [AO_SPC_NUM_RND:0] ext_ao_peripheral_slave_req_i,
++    input reg_req_t  [AO_SPC_NUM_RND:0] ext_ao_peripheral_slave_req_i,
+     output reg_rsp_t [AO_SPC_NUM_RND:0] ext_ao_peripheral_slave_resp_o,
+ 
+     // External slave ports
+-    output obi_req_t ext_core_instr_req_o,
+-    input obi_resp_t ext_core_instr_resp_i,
+-    output obi_req_t ext_core_data_req_o,
+-    input obi_resp_t ext_core_data_resp_i,
+-    output obi_req_t ext_debug_master_req_o,
+-    input obi_resp_t ext_debug_master_resp_i,
+-    output obi_req_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_read_req_o,
+-    input obi_resp_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_read_resp_i,
+-    output obi_req_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_write_req_o,
+-    input obi_resp_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_write_resp_i,
+-    output obi_req_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_addr_req_o,
+-    input obi_resp_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_addr_resp_i,
+-
+-    output fifo_req_t  [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_req_o,
+-    input  fifo_resp_t [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_resp_i,
++    output obi_req_t  ext_core_instr_req_o,
++    input  obi_resp_t ext_core_instr_resp_i,
++    output obi_req_t  ext_core_data_req_o,
++    input  obi_resp_t ext_core_data_resp_i,
++    output obi_req_t  ext_debug_master_req_o,
++    input  obi_resp_t ext_debug_master_resp_i,
++    output obi_req_t  [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_read_req_o,
++    input  obi_resp_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_read_resp_i,
++    output obi_req_t  [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_write_req_o,
++    input  obi_resp_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_write_resp_i,
++    output obi_req_t  [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_addr_req_o,
++    input  obi_resp_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] ext_dma_addr_resp_i,
++
++    output fifo_req_t [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_req_o,
++    input fifo_resp_t [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_resp_i,
+ 
+     input logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_stop_i,
+     input logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_done_i,
+@@ -275,8 +275,8 @@ module core_v_mini_mcu
+     output reg_req_t ext_peripheral_slave_req_o,
+     input  reg_rsp_t ext_peripheral_slave_resp_i,
+ 
+-    output logic [EXT_HARTS_RND-1:0] ext_debug_req_o,
+-    output logic ext_debug_reset_no,
++    output logic  [EXT_HARTS_RND-1:0] ext_debug_req_o,
++    output logic  ext_debug_reset_no,
+ 
+     // PLIC external interrupts
+     input logic [NEXT_INT_RND-1:0] intr_vector_ext_i,
+@@ -286,11 +286,11 @@ module core_v_mini_mcu
+     //power manager exposed to top level
+     //signals are unrolled to easy EDA tools
+     output logic cpu_subsystem_powergate_switch_no,
+-    input logic cpu_subsystem_powergate_switch_ack_ni,
++    input  logic cpu_subsystem_powergate_switch_ack_ni,
+     output logic peripheral_subsystem_powergate_switch_no,
+-    input logic peripheral_subsystem_powergate_switch_ack_ni,
++    input  logic peripheral_subsystem_powergate_switch_ack_ni,
+     output logic [EXT_DOMAINS_RND-1:0] external_subsystem_powergate_switch_no,
+-    input logic [EXT_DOMAINS_RND-1:0] external_subsystem_powergate_switch_ack_ni,
++    input  logic [EXT_DOMAINS_RND-1:0] external_subsystem_powergate_switch_ack_ni,
+     output logic [EXT_DOMAINS_RND-1:0] external_subsystem_powergate_iso_no,
+     output logic [EXT_DOMAINS_RND-1:0] external_subsystem_rst_no,
+     output logic ext_cpu_subsystem_rst_no,
+@@ -300,9 +300,20 @@ module core_v_mini_mcu
+     output logic [31:0] exit_value_o,
+ 
+     // External SPC interface
+-    input  logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_slot_tx_i,
+-    input  logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_slot_rx_i,
++    input logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_slot_tx_i,
++    input logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_slot_rx_i,
+     output logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] dma_done_o
++    `ifdef COPROC_FPU_SHARE
++      ,input  logic             apu_ext_req_i
++      ,output logic             apu_ext_gnt_o
++      ,input  logic [2:0][31:0] apu_ext_operands_i
++      ,input  logic [5:0]       apu_ext_op_i
++      ,input  logic [14:0]      apu_ext_flags_i
++      ,output logic             apu_ext_rvalid_o
++      ,output logic [31:0]      apu_ext_rdata_o
++      ,output logic [4:0]       apu_ext_rflags_o
++    `endif
++
+ );
+ 
+   import core_v_mini_mcu_pkg::*;
+@@ -313,7 +324,7 @@ module core_v_mini_mcu
+   localparam DM_HALTADDRESS = core_v_mini_mcu_pkg::DEBUG_START_ADDRESS + 32'h00000800; //debug rom code (section .text in linker) starts at 0x800
+ 
+   localparam JTAG_IDCODE = 32'h10001c05;
+-  localparam NRHARTS = EXT_HARTS + 1;  //external harts + single hart core-v-mini-mcu
++  localparam NRHARTS = EXT_HARTS + 1; //external harts + single hart core-v-mini-mcu
+   localparam BOOT_ADDR = core_v_mini_mcu_pkg::BOOTROM_START_ADDRESS;
+ 
+   // Log top level parameter values
+@@ -330,12 +341,12 @@ module core_v_mini_mcu
+   obi_resp_t core_data_resp;
+   obi_req_t debug_master_req;
+   obi_resp_t debug_master_resp;
+-  obi_req_t [1:0] dma_read_req;
+-  obi_resp_t [1:0] dma_read_resp;
+-  obi_req_t [1:0] dma_write_req;
+-  obi_resp_t [1:0] dma_write_resp;
+-  obi_req_t [1:0] dma_addr_req;
+-  obi_resp_t [1:0] dma_addr_resp;
++  obi_req_t [1:0]dma_read_req;
++  obi_resp_t [1:0]dma_read_resp;
++  obi_req_t [1:0]dma_write_req;
++  obi_resp_t [1:0]dma_write_resp;
++  obi_req_t [1:0]dma_addr_req;
++  obi_resp_t [1:0]dma_addr_resp;
+ 
+   // ram signals
+   obi_req_t [core_v_mini_mcu_pkg::NUM_BANKS-1:0] ram_slave_req;
+@@ -385,10 +396,10 @@ module core_v_mini_mcu
+   power_manager_out_t memory_subsystem_pwr_ctrl_out[core_v_mini_mcu_pkg::NUM_BANKS-1:0];
+   power_manager_out_t external_subsystem_pwr_ctrl_out[EXT_DOMAINS_RND-1:0];
+ 
+-  power_manager_in_t cpu_subsystem_pwr_ctrl_in;
+-  power_manager_in_t peripheral_subsystem_pwr_ctrl_in;
+-  power_manager_in_t memory_subsystem_pwr_ctrl_in[core_v_mini_mcu_pkg::NUM_BANKS-1:0];
+-  power_manager_in_t external_subsystem_pwr_ctrl_in[EXT_DOMAINS_RND-1:0];
++  power_manager_in_t  cpu_subsystem_pwr_ctrl_in;
++  power_manager_in_t  peripheral_subsystem_pwr_ctrl_in;
++  power_manager_in_t  memory_subsystem_pwr_ctrl_in[core_v_mini_mcu_pkg::NUM_BANKS-1:0];
++  power_manager_in_t  external_subsystem_pwr_ctrl_in[EXT_DOMAINS_RND-1:0];
+ 
+   logic cpu_subsystem_rst_n;
+   logic cpu_subsystem_powergate_iso_n;
+@@ -404,32 +415,32 @@ module core_v_mini_mcu
+   logic [core_v_mini_mcu_pkg::NUM_BANKS-1:0] memory_subsystem_clkgate_en_n;
+ 
+   //pwrgate exposed outside for UPF sim flow and switch cells
+-  assign cpu_subsystem_powergate_switch_no = cpu_subsystem_pwr_ctrl_out.pwrgate_en_n;
++  assign cpu_subsystem_powergate_switch_no    = cpu_subsystem_pwr_ctrl_out.pwrgate_en_n;
+   assign cpu_subsystem_pwr_ctrl_in.pwrgate_ack_n = cpu_subsystem_powergate_switch_ack_ni;
+   //isogate exposed outside for UPF sim flow and switch cells
+-  assign cpu_subsystem_powergate_iso_n = cpu_subsystem_pwr_ctrl_out.isogate_en_n;
+-  assign cpu_subsystem_rst_n = cpu_subsystem_pwr_ctrl_out.rst_n;
++  assign cpu_subsystem_powergate_iso_n                 = cpu_subsystem_pwr_ctrl_out.isogate_en_n;
++  assign cpu_subsystem_rst_n                  = cpu_subsystem_pwr_ctrl_out.rst_n;
+ 
+   //pwrgate exposed both outside for UPF sim flow
+   assign peripheral_subsystem_powergate_switch_no = peripheral_subsystem_pwr_ctrl_out.pwrgate_en_n;
+   assign peripheral_subsystem_pwr_ctrl_in.pwrgate_ack_n  = peripheral_subsystem_powergate_switch_ack_ni;
+   //isogate exposed outside for UPF sim flow and switch cells
+   assign peripheral_subsystem_powergate_iso_n = peripheral_subsystem_pwr_ctrl_out.isogate_en_n;
+-  assign peripheral_subsystem_rst_n = peripheral_subsystem_pwr_ctrl_out.rst_n;
+-  assign peripheral_subsystem_clkgate_en_n = peripheral_subsystem_pwr_ctrl_out.clkgate_en_n;
+-
+-  assign memory_subsystem_banks_powergate_switch_n[0] = memory_subsystem_pwr_ctrl_out[0].pwrgate_en_n;
+-  assign memory_subsystem_pwr_ctrl_in[0].pwrgate_ack_n = memory_subsystem_banks_powergate_switch_ack_n[0];
+-  //isogate exposed outside for UPF sim flow and switch cells
+-  assign memory_subsystem_banks_powergate_iso_n[0] = memory_subsystem_pwr_ctrl_out[0].isogate_en_n;
+-  assign memory_subsystem_banks_set_retentive_n[0] = memory_subsystem_pwr_ctrl_out[0].retentive_en_n;
+-  assign memory_subsystem_clkgate_en_n[0] = memory_subsystem_pwr_ctrl_out[0].clkgate_en_n;
+-  assign memory_subsystem_banks_powergate_switch_n[1] = memory_subsystem_pwr_ctrl_out[1].pwrgate_en_n;
+-  assign memory_subsystem_pwr_ctrl_in[1].pwrgate_ack_n = memory_subsystem_banks_powergate_switch_ack_n[1];
+-  //isogate exposed outside for UPF sim flow and switch cells
+-  assign memory_subsystem_banks_powergate_iso_n[1] = memory_subsystem_pwr_ctrl_out[1].isogate_en_n;
+-  assign memory_subsystem_banks_set_retentive_n[1] = memory_subsystem_pwr_ctrl_out[1].retentive_en_n;
+-  assign memory_subsystem_clkgate_en_n[1] = memory_subsystem_pwr_ctrl_out[1].clkgate_en_n;
++  assign peripheral_subsystem_rst_n           = peripheral_subsystem_pwr_ctrl_out.rst_n;
++  assign peripheral_subsystem_clkgate_en_n    = peripheral_subsystem_pwr_ctrl_out.clkgate_en_n;
++
++    assign memory_subsystem_banks_powergate_switch_n[0] = memory_subsystem_pwr_ctrl_out[0].pwrgate_en_n;
++    assign memory_subsystem_pwr_ctrl_in[0].pwrgate_ack_n = memory_subsystem_banks_powergate_switch_ack_n[0];
++    //isogate exposed outside for UPF sim flow and switch cells
++    assign memory_subsystem_banks_powergate_iso_n[0] = memory_subsystem_pwr_ctrl_out[0].isogate_en_n;
++    assign memory_subsystem_banks_set_retentive_n[0] = memory_subsystem_pwr_ctrl_out[0].retentive_en_n;
++    assign memory_subsystem_clkgate_en_n[0] = memory_subsystem_pwr_ctrl_out[0].clkgate_en_n;
++    assign memory_subsystem_banks_powergate_switch_n[1] = memory_subsystem_pwr_ctrl_out[1].pwrgate_en_n;
++    assign memory_subsystem_pwr_ctrl_in[1].pwrgate_ack_n = memory_subsystem_banks_powergate_switch_ack_n[1];
++    //isogate exposed outside for UPF sim flow and switch cells
++    assign memory_subsystem_banks_powergate_iso_n[1] = memory_subsystem_pwr_ctrl_out[1].isogate_en_n;
++    assign memory_subsystem_banks_set_retentive_n[1] = memory_subsystem_pwr_ctrl_out[1].retentive_en_n;
++    assign memory_subsystem_clkgate_en_n[1] = memory_subsystem_pwr_ctrl_out[1].clkgate_en_n;
+ 
+   for (genvar i = 0; i < EXT_DOMAINS_RND; i = i + 1) begin : gen_external_subsystem_pwr_gating
+     assign external_subsystem_powergate_switch_no[i]        = external_subsystem_pwr_ctrl_out[i].pwrgate_en_n;
+@@ -447,7 +458,7 @@ module core_v_mini_mcu
+   // SPI
+   logic spi_flash_intr, spi_intr, spi_rx_valid, spi_tx_ready;
+ 
+-  /* verilator lint_off UNDRIVEN */
++/* verilator lint_off UNDRIVEN */
+   // GPIO
+   logic [31:8] gpio_in;
+   logic [31:8] gpio_out;
+@@ -458,12 +469,14 @@ module core_v_mini_mcu
+   logic [7:0] gpio_ao_out;
+   logic [7:0] gpio_ao_oe;
+   logic [7:0] gpio_ao_intr;
+-  /* verilator lint_on UNDRIVEN */
++/* verilator lint_on UNDRIVEN */
+ 
+   // I2s
+   logic i2s_rx_valid;
+ 
+-  assign intr = {irq_fast, 4'b0, irq_external, 3'b0, rv_timer_intr[0], 3'b0, irq_software, 3'b0};
++  assign intr = {
++    irq_fast, 4'b0, irq_external, 3'b0, rv_timer_intr[0], 3'b0, irq_software, 3'b0
++  };
+ 
+   assign fast_intr = {
+     intr_ext_peripheral_i,
+@@ -500,12 +513,24 @@ module core_v_mini_mcu
+       .irq_id_o(irq_id_out),
+       .debug_req_i(debug_core_req),
+       .core_sleep_o(core_sleep)
++            `ifdef COPROC_FPU_SHARE
++        ,.apu_ext_req_i
++        ,.apu_ext_gnt_o
++        ,.apu_ext_operands_i
++        ,.apu_ext_op_i
++        ,.apu_ext_flags_i
++        ,.apu_ext_rvalid_o
++        ,.apu_ext_rdata_o
++        ,.apu_ext_rflags_o
++      `endif
++
++
+   );
+ 
+   debug_subsystem #(
+       .NRHARTS    (NRHARTS),
+       .JTAG_IDCODE(JTAG_IDCODE),
+-      .SPI_SLAVE  (1)
++      .SPI_SLAVE(1)
+   ) debug_subsystem_i (
+       .clk_i,
+       .rst_ni,
+@@ -603,13 +628,11 @@ module core_v_mini_mcu
+       .w25q128jw_controller_intr_o(w25q128jw_controller_intr),
+       .spi_flash_sck_o,
+       .spi_flash_sck_en_o(spi_flash_sck_oe_o),
+-      .spi_flash_csb_o({spi_flash_cs_1_o, spi_flash_cs_0_o}),
++      .spi_flash_csb_o({spi_flash_cs_1_o,spi_flash_cs_0_o}),
+       .spi_flash_csb_en_o({spi_flash_cs_1_oe_o, spi_flash_cs_0_oe_o}),
+-      .spi_flash_sd_o({spi_flash_sd_3_o, spi_flash_sd_2_o, spi_flash_sd_1_o, spi_flash_sd_0_o}),
+-      .spi_flash_sd_en_o({
+-        spi_flash_sd_3_oe_o, spi_flash_sd_2_oe_o, spi_flash_sd_1_oe_o, spi_flash_sd_0_oe_o
+-      }),
+-      .spi_flash_sd_i({spi_flash_sd_3_i, spi_flash_sd_2_i, spi_flash_sd_1_i, spi_flash_sd_0_i}),
++      .spi_flash_sd_o({spi_flash_sd_3_o,spi_flash_sd_2_o, spi_flash_sd_1_o, spi_flash_sd_0_o}),
++      .spi_flash_sd_en_o({spi_flash_sd_3_oe_o,spi_flash_sd_2_oe_o, spi_flash_sd_1_oe_o, spi_flash_sd_0_oe_o}),
++      .spi_flash_sd_i({spi_flash_sd_3_i,spi_flash_sd_2_i, spi_flash_sd_1_i, spi_flash_sd_0_i}),
+       .intr_i(intr),
+       .intr_vector_ext_i,
+       .core_sleep_i(core_sleep),
+@@ -675,11 +698,11 @@ module core_v_mini_mcu
+       .cio_sda_en_o(i2c_sda_oe_o),
+       .spi_sck_o,
+       .spi_sck_en_o(spi_sck_oe_o),
+-      .spi_csb_o({spi_cs_1_o, spi_cs_0_o}),
++      .spi_csb_o({spi_cs_1_o,spi_cs_0_o}),
+       .spi_csb_en_o({spi_cs_1_oe_o, spi_cs_0_oe_o}),
+-      .spi_sd_o({spi_sd_3_o, spi_sd_2_o, spi_sd_1_o, spi_sd_0_o}),
+-      .spi_sd_en_o({spi_sd_3_oe_o, spi_sd_2_oe_o, spi_sd_1_oe_o, spi_sd_0_oe_o}),
+-      .spi_sd_i({spi_sd_3_i, spi_sd_2_i, spi_sd_1_i, spi_sd_0_i}),
++      .spi_sd_o({spi_sd_3_o,spi_sd_2_o, spi_sd_1_o, spi_sd_0_o}),
++      .spi_sd_en_o({spi_sd_3_oe_o,spi_sd_2_oe_o, spi_sd_1_oe_o, spi_sd_0_oe_o}),
++      .spi_sd_i({spi_sd_3_i,spi_sd_2_i, spi_sd_1_i, spi_sd_0_i}),
+       .spi_intr_event_o(spi_intr),
+       .spi_rx_valid_o(spi_rx_valid),
+       .spi_tx_ready_o(spi_tx_ready),
+@@ -721,8 +744,8 @@ module core_v_mini_mcu
+ 
+   // Debug_req assign
+   if (NRHARTS == 1) begin : gen_single_hart_debug
+-    assign debug_core_req  = debug_req;
+-    assign ext_debug_req_o = 1'b0;
++    assign debug_core_req = debug_req;
++    assign ext_debug_req_o  = 1'b0;
+   end else begin : gen_multi_hart_debug
+     always @(*) begin
+       for (int i = 0; i < NRHARTS; i++) begin
+@@ -733,139 +756,139 @@ module core_v_mini_mcu
+   end
+ 
+   assign ext_cpu_subsystem_rst_no = cpu_subsystem_rst_n;
+-  assign ext_debug_reset_no       = debug_reset_n;
++  assign ext_debug_reset_no = debug_reset_n;
+ 
+-  assign pdm2pcm_pdm_o            = 0;
+-  assign pdm2pcm_pdm_oe_o         = 0;
++  assign pdm2pcm_pdm_o = 0;
++  assign pdm2pcm_pdm_oe_o = 0;
+ 
+ 
+-  assign gpio_ao_in[0]            = gpio_0_i;
+-  assign gpio_0_o                 = gpio_ao_out[0];
+-  assign gpio_0_oe_o              = gpio_ao_oe[0];
++        assign gpio_ao_in[0] = gpio_0_i;
++        assign gpio_0_o      = gpio_ao_out[0];
++        assign gpio_0_oe_o   = gpio_ao_oe[0];
+ 
+-  assign gpio_ao_in[1]            = gpio_1_i;
+-  assign gpio_1_o                 = gpio_ao_out[1];
+-  assign gpio_1_oe_o              = gpio_ao_oe[1];
++        assign gpio_ao_in[1] = gpio_1_i;
++        assign gpio_1_o      = gpio_ao_out[1];
++        assign gpio_1_oe_o   = gpio_ao_oe[1];
+ 
+-  assign gpio_ao_in[2]            = gpio_2_i;
+-  assign gpio_2_o                 = gpio_ao_out[2];
+-  assign gpio_2_oe_o              = gpio_ao_oe[2];
++        assign gpio_ao_in[2] = gpio_2_i;
++        assign gpio_2_o      = gpio_ao_out[2];
++        assign gpio_2_oe_o   = gpio_ao_oe[2];
+ 
+-  assign gpio_ao_in[3]            = gpio_3_i;
+-  assign gpio_3_o                 = gpio_ao_out[3];
+-  assign gpio_3_oe_o              = gpio_ao_oe[3];
++        assign gpio_ao_in[3] = gpio_3_i;
++        assign gpio_3_o      = gpio_ao_out[3];
++        assign gpio_3_oe_o   = gpio_ao_oe[3];
+ 
+-  assign gpio_ao_in[4]            = gpio_4_i;
+-  assign gpio_4_o                 = gpio_ao_out[4];
+-  assign gpio_4_oe_o              = gpio_ao_oe[4];
++        assign gpio_ao_in[4] = gpio_4_i;
++        assign gpio_4_o      = gpio_ao_out[4];
++        assign gpio_4_oe_o   = gpio_ao_oe[4];
+ 
+-  assign gpio_ao_in[5]            = gpio_5_i;
+-  assign gpio_5_o                 = gpio_ao_out[5];
+-  assign gpio_5_oe_o              = gpio_ao_oe[5];
++        assign gpio_ao_in[5] = gpio_5_i;
++        assign gpio_5_o      = gpio_ao_out[5];
++        assign gpio_5_oe_o   = gpio_ao_oe[5];
+ 
+-  assign gpio_ao_in[6]            = gpio_6_i;
+-  assign gpio_6_o                 = gpio_ao_out[6];
+-  assign gpio_6_oe_o              = gpio_ao_oe[6];
++        assign gpio_ao_in[6] = gpio_6_i;
++        assign gpio_6_o      = gpio_ao_out[6];
++        assign gpio_6_oe_o   = gpio_ao_oe[6];
+ 
+-  assign gpio_ao_in[7]            = gpio_7_i;
+-  assign gpio_7_o                 = gpio_ao_out[7];
+-  assign gpio_7_oe_o              = gpio_ao_oe[7];
++        assign gpio_ao_in[7] = gpio_7_i;
++        assign gpio_7_o      = gpio_ao_out[7];
++        assign gpio_7_oe_o   = gpio_ao_oe[7];
+ 
+-  assign gpio_in[8]               = gpio_8_i;
+-  assign gpio_8_o                 = gpio_out[8];
+-  assign gpio_8_oe_o              = gpio_oe[8];
++        assign gpio_in[8]  = gpio_8_i;
++        assign gpio_8_o    = gpio_out[8];
++        assign gpio_8_oe_o = gpio_oe[8];
+ 
+-  assign gpio_in[9]               = gpio_9_i;
+-  assign gpio_9_o                 = gpio_out[9];
+-  assign gpio_9_oe_o              = gpio_oe[9];
++        assign gpio_in[9]  = gpio_9_i;
++        assign gpio_9_o    = gpio_out[9];
++        assign gpio_9_oe_o = gpio_oe[9];
+ 
+-  assign gpio_in[10]              = gpio_10_i;
+-  assign gpio_10_o                = gpio_out[10];
+-  assign gpio_10_oe_o             = gpio_oe[10];
++        assign gpio_in[10]  = gpio_10_i;
++        assign gpio_10_o    = gpio_out[10];
++        assign gpio_10_oe_o = gpio_oe[10];
+ 
+-  assign gpio_in[11]              = gpio_11_i;
+-  assign gpio_11_o                = gpio_out[11];
+-  assign gpio_11_oe_o             = gpio_oe[11];
++        assign gpio_in[11]  = gpio_11_i;
++        assign gpio_11_o    = gpio_out[11];
++        assign gpio_11_oe_o = gpio_oe[11];
+ 
+-  assign gpio_in[12]              = gpio_12_i;
+-  assign gpio_12_o                = gpio_out[12];
+-  assign gpio_12_oe_o             = gpio_oe[12];
++        assign gpio_in[12]  = gpio_12_i;
++        assign gpio_12_o    = gpio_out[12];
++        assign gpio_12_oe_o = gpio_oe[12];
+ 
+-  assign gpio_in[13]              = gpio_13_i;
+-  assign gpio_13_o                = gpio_out[13];
+-  assign gpio_13_oe_o             = gpio_oe[13];
++        assign gpio_in[13]  = gpio_13_i;
++        assign gpio_13_o    = gpio_out[13];
++        assign gpio_13_oe_o = gpio_oe[13];
+ 
+-  assign gpio_in[14]              = gpio_14_i;
+-  assign gpio_14_o                = gpio_out[14];
+-  assign gpio_14_oe_o             = gpio_oe[14];
++        assign gpio_in[14]  = gpio_14_i;
++        assign gpio_14_o    = gpio_out[14];
++        assign gpio_14_oe_o = gpio_oe[14];
+ 
+-  assign gpio_in[15]              = gpio_15_i;
+-  assign gpio_15_o                = gpio_out[15];
+-  assign gpio_15_oe_o             = gpio_oe[15];
++        assign gpio_in[15]  = gpio_15_i;
++        assign gpio_15_o    = gpio_out[15];
++        assign gpio_15_oe_o = gpio_oe[15];
+ 
+-  assign gpio_in[16]              = gpio_16_i;
+-  assign gpio_16_o                = gpio_out[16];
+-  assign gpio_16_oe_o             = gpio_oe[16];
++        assign gpio_in[16]  = gpio_16_i;
++        assign gpio_16_o    = gpio_out[16];
++        assign gpio_16_oe_o = gpio_oe[16];
+ 
+-  assign gpio_in[17]              = gpio_17_i;
+-  assign gpio_17_o                = gpio_out[17];
+-  assign gpio_17_oe_o             = gpio_oe[17];
++        assign gpio_in[17]  = gpio_17_i;
++        assign gpio_17_o    = gpio_out[17];
++        assign gpio_17_oe_o = gpio_oe[17];
+ 
+-  assign gpio_in[18]              = gpio_18_i;
+-  assign gpio_18_o                = gpio_out[18];
+-  assign gpio_18_oe_o             = gpio_oe[18];
++        assign gpio_in[18]  = gpio_18_i;
++        assign gpio_18_o    = gpio_out[18];
++        assign gpio_18_oe_o = gpio_oe[18];
+ 
+-  assign gpio_in[19]              = gpio_19_i;
+-  assign gpio_19_o                = gpio_out[19];
+-  assign gpio_19_oe_o             = gpio_oe[19];
++        assign gpio_in[19]  = gpio_19_i;
++        assign gpio_19_o    = gpio_out[19];
++        assign gpio_19_oe_o = gpio_oe[19];
+ 
+-  assign gpio_in[20]              = gpio_20_i;
+-  assign gpio_20_o                = gpio_out[20];
+-  assign gpio_20_oe_o             = gpio_oe[20];
++        assign gpio_in[20]  = gpio_20_i;
++        assign gpio_20_o    = gpio_out[20];
++        assign gpio_20_oe_o = gpio_oe[20];
+ 
+-  assign gpio_in[21]              = gpio_21_i;
+-  assign gpio_21_o                = gpio_out[21];
+-  assign gpio_21_oe_o             = gpio_oe[21];
++        assign gpio_in[21]  = gpio_21_i;
++        assign gpio_21_o    = gpio_out[21];
++        assign gpio_21_oe_o = gpio_oe[21];
+ 
+-  assign gpio_in[22]              = gpio_22_i;
+-  assign gpio_22_o                = gpio_out[22];
+-  assign gpio_22_oe_o             = gpio_oe[22];
++        assign gpio_in[22]  = gpio_22_i;
++        assign gpio_22_o    = gpio_out[22];
++        assign gpio_22_oe_o = gpio_oe[22];
+ 
+-  assign gpio_in[23]              = gpio_23_i;
+-  assign gpio_23_o                = gpio_out[23];
+-  assign gpio_23_oe_o             = gpio_oe[23];
++        assign gpio_in[23]  = gpio_23_i;
++        assign gpio_23_o    = gpio_out[23];
++        assign gpio_23_oe_o = gpio_oe[23];
+ 
+-  assign gpio_in[24]              = gpio_24_i;
+-  assign gpio_24_o                = gpio_out[24];
+-  assign gpio_24_oe_o             = gpio_oe[24];
++        assign gpio_in[24]  = gpio_24_i;
++        assign gpio_24_o    = gpio_out[24];
++        assign gpio_24_oe_o = gpio_oe[24];
+ 
+-  assign gpio_in[25]              = gpio_25_i;
+-  assign gpio_25_o                = gpio_out[25];
+-  assign gpio_25_oe_o             = gpio_oe[25];
++        assign gpio_in[25]  = gpio_25_i;
++        assign gpio_25_o    = gpio_out[25];
++        assign gpio_25_oe_o = gpio_oe[25];
+ 
+-  assign gpio_in[26]              = gpio_26_i;
+-  assign gpio_26_o                = gpio_out[26];
+-  assign gpio_26_oe_o             = gpio_oe[26];
++        assign gpio_in[26]  = gpio_26_i;
++        assign gpio_26_o    = gpio_out[26];
++        assign gpio_26_oe_o = gpio_oe[26];
+ 
+-  assign gpio_in[27]              = gpio_27_i;
+-  assign gpio_27_o                = gpio_out[27];
+-  assign gpio_27_oe_o             = gpio_oe[27];
++        assign gpio_in[27]  = gpio_27_i;
++        assign gpio_27_o    = gpio_out[27];
++        assign gpio_27_oe_o = gpio_oe[27];
+ 
+-  assign gpio_in[28]              = gpio_28_i;
+-  assign gpio_28_o                = gpio_out[28];
+-  assign gpio_28_oe_o             = gpio_oe[28];
++        assign gpio_in[28]  = gpio_28_i;
++        assign gpio_28_o    = gpio_out[28];
++        assign gpio_28_oe_o = gpio_oe[28];
+ 
+-  assign gpio_in[29]              = gpio_29_i;
+-  assign gpio_29_o                = gpio_out[29];
+-  assign gpio_29_oe_o             = gpio_oe[29];
++        assign gpio_in[29]  = gpio_29_i;
++        assign gpio_29_o    = gpio_out[29];
++        assign gpio_29_oe_o = gpio_oe[29];
+ 
+-  assign gpio_in[31]              = gpio_31_i;
+-  assign gpio_31_o                = gpio_out[31];
+-  assign gpio_31_oe_o             = gpio_oe[31];
++        assign gpio_in[31]  = gpio_31_i;
++        assign gpio_31_o    = gpio_out[31];
++        assign gpio_31_oe_o = gpio_oe[31];
+ 
+-  assign gpio_in[30]              = gpio_30_i;
+-  assign gpio_30_o                = gpio_out[30];
+-  assign gpio_30_oe_o             = gpio_oe[30];
++        assign gpio_in[30]  = gpio_30_i;
++        assign gpio_30_o    = gpio_out[30];
++        assign gpio_30_oe_o = gpio_oe[30];
+ 
+ 
+ endmodule  // core_v_mini_mcu
+diff --git a/hw/core-v-mini-mcu/core_v_mini_mcu.sv.tpl b/hw/core-v-mini-mcu/core_v_mini_mcu.sv.tpl
+index fa07d9f..aa5a3ab 100644
+--- a/hw/core-v-mini-mcu/core_v_mini_mcu.sv.tpl
++++ b/hw/core-v-mini-mcu/core_v_mini_mcu.sv.tpl
+@@ -127,6 +127,17 @@ module core_v_mini_mcu
+     input logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_slot_tx_i,
+     input logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_slot_rx_i,
+     output logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] dma_done_o
++    `ifdef COPROC_FPU_SHARE
++      ,input  logic             apu_ext_req_i
++      ,output logic             apu_ext_gnt_o
++      ,input  logic [2:0][31:0] apu_ext_operands_i
++      ,input  logic [5:0]       apu_ext_op_i
++      ,input  logic [14:0]      apu_ext_flags_i
++      ,output logic             apu_ext_rvalid_o
++      ,output logic [31:0]      apu_ext_rdata_o
++      ,output logic [4:0]       apu_ext_rflags_o
++    `endif
++
+ );
+ 
+   import core_v_mini_mcu_pkg::*;
+@@ -322,6 +333,18 @@ module core_v_mini_mcu
+       .irq_id_o(irq_id_out),
+       .debug_req_i(debug_core_req),
+       .core_sleep_o(core_sleep)
++            `ifdef COPROC_FPU_SHARE
++        ,.apu_ext_req_i
++        ,.apu_ext_gnt_o
++        ,.apu_ext_operands_i
++        ,.apu_ext_op_i
++        ,.apu_ext_flags_i
++        ,.apu_ext_rvalid_o
++        ,.apu_ext_rdata_o
++        ,.apu_ext_rflags_o
++      `endif
++
++
+   );
+ 
+   debug_subsystem #(
+diff --git a/hw/core-v-mini-mcu/cpu_subsystem.sv.tpl b/hw/core-v-mini-mcu/cpu_subsystem.sv.tpl
+index fc323ab..048b4e5 100644
+--- a/hw/core-v-mini-mcu/cpu_subsystem.sv.tpl
++++ b/hw/core-v-mini-mcu/cpu_subsystem.sv.tpl
+@@ -47,6 +47,16 @@ module cpu_subsystem
+ 
+     // sleep
+     output logic core_sleep_o
++    `ifdef COPROC_FPU_SHARE
++        ,input  logic             apu_ext_req_i
++        ,output logic             apu_ext_gnt_o
++        ,input  logic [2:0][31:0] apu_ext_operands_i
++        ,input  logic [5:0]       apu_ext_op_i
++        ,input  logic [14:0]      apu_ext_flags_i
++        ,output logic             apu_ext_rvalid_o
++        ,output logic [31:0]      apu_ext_rdata_o
++        ,output logic [4:0]       apu_ext_rflags_o
++    `endif
+ );
+ 
+ 
+@@ -319,6 +329,17 @@ ${",\n".join(cv32e40px_params)}
+ 
+         .fetch_enable_i(fetch_enable),
+         .core_sleep_o
++                `ifdef COPROC_FPU_SHARE
++            ,.apu_ext_req_i
++            ,.apu_ext_gnt_o
++            ,.apu_ext_operands_i
++            ,.apu_ext_op_i
++            ,.apu_ext_flags_i
++            ,.apu_ext_rvalid_o
++            ,.apu_ext_rdata_o
++            ,.apu_ext_rflags_o
++        `endif
++
+ 
+     );
+ 
+diff --git a/hw/core-v-mini-mcu/cv32e40px_xif_wrapper.sv b/hw/core-v-mini-mcu/cv32e40px_xif_wrapper.sv
+index 5437d7d..3b1f726 100644
+--- a/hw/core-v-mini-mcu/cv32e40px_xif_wrapper.sv
++++ b/hw/core-v-mini-mcu/cv32e40px_xif_wrapper.sv
+@@ -70,6 +70,17 @@ module cv32e40px_xif_wrapper
+     // CPU Control Signals
+     input  logic fetch_enable_i,
+     output logic core_sleep_o
++    `ifdef COPROC_FPU_SHARE
++      ,input  logic             apu_ext_req_i
++      ,output logic             apu_ext_gnt_o
++      ,input  logic [2:0][31:0] apu_ext_operands_i
++      ,input  logic [5:0]       apu_ext_op_i
++      ,input  logic [14:0]      apu_ext_flags_i
++      ,output logic             apu_ext_rvalid_o
++      ,output logic [31:0]      apu_ext_rdata_o
++      ,output logic [4:0]       apu_ext_rflags_o
++  `endif
++
+ );
+ 
+ 
+@@ -249,6 +260,17 @@ module cv32e40px_xif_wrapper
+       .debug_halted_o,
+       .fetch_enable_i,
+       .core_sleep_o
++      `ifdef COPROC_FPU_SHARE
++        ,.apu_ext_req_i
++        ,.apu_ext_gnt_o
++        ,.apu_ext_operands_i
++        ,.apu_ext_op_i
++        ,.apu_ext_flags_i
++        ,.apu_ext_rvalid_o
++        ,.apu_ext_rdata_o
++        ,.apu_ext_rflags_o
++      `endif
++
+   );
+ 
+ 
+diff --git a/hw/system/x_heep_system.sv.tpl b/hw/system/x_heep_system.sv.tpl
+index d0d8b72..0470c13 100644
+--- a/hw/system/x_heep_system.sv.tpl
++++ b/hw/system/x_heep_system.sv.tpl
+@@ -111,6 +111,17 @@ module x_heep_system
+         inout wire ${pin0_name}o${"" if loop.last else ","}
+       % endif
+     % endfor
++    `ifdef COPROC_FPU_SHARE
++      ,input  logic             apu_ext_req_i
++      ,output logic             apu_ext_gnt_o
++      ,input  logic [2:0][31:0] apu_ext_operands_i
++      ,input  logic [5:0]       apu_ext_op_i
++      ,input  logic [14:0]      apu_ext_flags_i
++      ,output logic             apu_ext_rvalid_o
++      ,output logic [31:0]      apu_ext_rdata_o
++      ,output logic [4:0]       apu_ext_rflags_o
++    `endif
++
+ );
+ 
+   import core_v_mini_mcu_pkg::*;
+@@ -222,6 +233,17 @@ module x_heep_system
+     .ext_dma_slot_tx_i,
+     .ext_dma_slot_rx_i,
+     .dma_done_o
++    `ifdef COPROC_FPU_SHARE
++      ,.apu_ext_req_i
++      ,.apu_ext_gnt_o
++      ,.apu_ext_operands_i
++      ,.apu_ext_op_i
++      ,.apu_ext_flags_i
++      ,.apu_ext_rvalid_o
++      ,.apu_ext_rdata_o
++      ,.apu_ext_rflags_o
++    `endif
++
+   );
+ 
+ <%
+diff --git a/hw/vendor/waiver/lint/cv32e40px.vlt b/hw/vendor/waiver/lint/cv32e40px.vlt
+index bfff7c9..3823b5a 100644
+--- a/hw/vendor/waiver/lint/cv32e40px.vlt
++++ b/hw/vendor/waiver/lint/cv32e40px.vlt
+@@ -118,3 +118,5 @@ lint_off -rule WIDTH -file "*/rtl/cv32e40px_register_file_ff.sv" -match "Logical
+ lint_off -rule WIDTH -file "*/rtl/cv32e40px_decoder.sv" -match "Logical operator LOGNOT expects 1 bit on the LHS*"
+ lint_off -rule WIDTH -file "*/rtl/cv32e40px_ex_stage.sv" -match "Logical operator LOGNOT expects 1 bit on the LHS*"
+ lint_off -rule COMBDLY -file "*/bhv/cv32e40px_sim_clock_gate.sv" -match "Non-blocking assignment '<=' in combinational logic process"
++lint_off -rule WIDTHEXPAND -file "*/rtl/cv32e40px_decoder.sv"
++lint_off -rule WIDTHTRUNC  -file "*/rtl/cv32e40px_decoder.sv"
+diff --git a/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_top.sv b/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_top.sv
+index 03b9962..fff5d9f 100644
+--- a/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_top.sv
++++ b/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_top.sv
+@@ -112,6 +112,18 @@ module cv32e40px_top
+     // CPU Control Signals
+     input  logic fetch_enable_i,
+     output logic core_sleep_o
++    `ifdef COPROC_FPU_SHARE
++        // Shared-FPU coprocessor APU port (DMA dot-product accelerator)
++        ,input  logic             apu_ext_req_i
++        ,output logic             apu_ext_gnt_o
++        ,input  logic [2:0][31:0] apu_ext_operands_i   // APU_NARGS_CPU = 3
++        ,input  logic [5:0]       apu_ext_op_i         // APU_WOP_CPU = 6
++        ,input  logic [14:0]      apu_ext_flags_i      // APU_NDSFLAGS_CPU = 15
++        ,output logic             apu_ext_rvalid_o
++        ,output logic [31:0]      apu_ext_rdata_o
++        ,output logic [4:0]       apu_ext_rflags_o     // APU_NUSFLAGS_CPU = 5
++    `endif
++
+ );
+ 
+   import cv32e40px_apu_core_pkg::*;
+@@ -226,8 +238,94 @@ module cv32e40px_top
+ 
+   generate
+     if (FPU) begin : fpu_gen
++      // Wrapper-side (FMA) APU nets. Coprocessor kapalıyken bunlar core-side ile
++      // aynıdır (stock davranış); açıkken araya arbiter girer.
++      logic                             w_apu_req;
++      logic                             w_apu_gnt;
++      logic [   APU_NARGS_CPU-1:0][31:0] w_apu_operands;
++      logic [     APU_WOP_CPU-1:0]       w_apu_op;
++      logic [APU_NDSFLAGS_CPU-1:0]       w_apu_flags;
++      logic                             w_apu_rvalid;
++      logic [                31:0]       w_apu_rdata;
++      logic [APU_NUSFLAGS_CPU-1:0]       w_apu_rflags;
++
++`ifdef COPROC_FPU_SHARE
++      // ---- Shared-FPU CPU-priority arbiter (tez katkısı) ----
++      logic fma_active;
++      dma_apu_arbiter arb_i (
++          .clk_i (clk_i),
++          .rst_ni(rst_ni),
++          // CPU tarafı (core'dan)
++          .cpu_req_i     (apu_req),
++          .cpu_gnt_o     (apu_gnt),
++          .cpu_operands_i(apu_operands),
++          .cpu_op_i      (apu_op),
++          .cpu_flags_i   (apu_flags),
++          .cpu_rvalid_o  (apu_rvalid),
++          .cpu_rdata_o   (apu_rdata),
++          .cpu_rflags_o  (apu_rflags),
++            // DMA coprocessor side
++          .dma_req_i     (apu_ext_req_i),
++          .dma_gnt_o     (apu_ext_gnt_o),
++          .dma_operands_i(apu_ext_operands_i),
++          .dma_op_i      (apu_ext_op_i),
++          .dma_flags_i   (apu_ext_flags_i),
++          .dma_rvalid_o  (apu_ext_rvalid_o),
++          .dma_rdata_o   (apu_ext_rdata_o),
++          .dma_rflags_o  (apu_ext_rflags_o),
++
++          // FPU (FMA wrapper) tarafı
++          .fpu_req_o     (w_apu_req),
++          .fpu_gnt_i     (w_apu_gnt),
++          .fpu_operands_o(w_apu_operands),
++          .fpu_op_o      (w_apu_op),
++          .fpu_flags_o   (w_apu_flags),
++          .fpu_rvalid_i  (w_apu_rvalid),
++          .fpu_rdata_i   (w_apu_rdata),
++          .fpu_rflags_i  (w_apu_rflags),
++          .fma_active_o  (fma_active)
++      );
++      assign apu_clk_en = apu_req | apu_busy | fma_active;
++`else
++      // Stock: wrapper-side == core-side (arbiter yok)
++      assign w_apu_req      = apu_req;
++      assign w_apu_operands = apu_operands;
++      assign w_apu_op       = apu_op;
++      assign w_apu_flags    = apu_flags;
++      assign apu_gnt        = w_apu_gnt;
++      assign apu_rvalid     = w_apu_rvalid;
++      assign apu_rdata      = w_apu_rdata;
++      assign apu_rflags     = w_apu_rflags;
++      assign apu_clk_en     = apu_req | apu_busy;
++`endif
++
++      // FPU clock gate
++      cv32e40px_clock_gate core_clock_gate_i (
++          .clk_i       (clk_i),
++          .en_i        (apu_clk_en),
++          .scan_cg_en_i(scan_cg_en_i),
++          .clk_o       (apu_clk)
++      );
++
++      // FPU wrapper (artık wrapper-side net'lerle sürülüyor)
++      cv32e40px_fp_wrapper #(
++          .FPU_ADDMUL_LAT(FPU_ADDMUL_LAT),
++          .FPU_OTHERS_LAT(FPU_OTHERS_LAT)
++      ) fp_wrapper_i (
++          .clk_i         (apu_clk),
++          .rst_ni        (rst_ni),
++          .apu_req_i     (w_apu_req),
++          .apu_gnt_o     (w_apu_gnt),
++          .apu_operands_i(w_apu_operands),
++          .apu_op_i      (w_apu_op),
++          .apu_flags_i   (w_apu_flags),
++          .apu_rvalid_o  (w_apu_rvalid),
++          .apu_rdata_o   (w_apu_rdata),
++          .apu_rflags_o  (w_apu_rflags)
++      );
+ 
+-      assign apu_clk_en = apu_req | apu_busy;
++
++      /* assign apu_clk_en = apu_req | apu_busy;
+ 
+       // FPU clock gate
+       cv32e40px_clock_gate core_clock_gate_i (
+@@ -252,7 +350,7 @@ module cv32e40px_top
+           .apu_rvalid_o  (apu_rvalid),
+           .apu_rdata_o   (apu_rdata),
+           .apu_rflags_o  (apu_rflags)
+-      );
++      ); */
+     end else begin : no_fpu_gen
+       // Drive FPU output signals to 0
+       assign apu_gnt    = '0;
+diff --git a/hw/vendor/xheep_cv32e40px.core b/hw/vendor/xheep_cv32e40px.core
+index 2eb5ab4..26a6ef5 100644
+--- a/hw/vendor/xheep_cv32e40px.core
++++ b/hw/vendor/xheep_cv32e40px.core
+@@ -41,6 +41,7 @@ filesets:
+     - xheep/cv32e40px/rtl/cv32e40px_x_disp.sv
+     - xheep/cv32e40px/rtl/cv32e40px_fifo.sv
+     - xheep/cv32e40px/rtl/cv32e40px_fp_wrapper.sv
++    - xheep/cv32e40px/rtl/dma_apu_arbiter.sv
+     - xheep/cv32e40px/rtl/cv32e40px_top.sv
+     file_type: systemVerilogSource
+ 
+diff --git a/sw/applications/example_matfloat/main.c b/sw/applications/example_matfloat/main.c
+index 61f023a..21b4a85 100644
+--- a/sw/applications/example_matfloat/main.c
++++ b/sw/applications/example_matfloat/main.c
+@@ -13,7 +13,7 @@
+ 
+ /* By default, printfs are activated for FPGA and disabled for simulation. */
+ #define PRINTF_IN_FPGA  1
+-#define PRINTF_IN_SIM   0
++#define PRINTF_IN_SIM   1
+ 
+ #if TARGET_SIM && PRINTF_IN_SIM
+         #define PRINTF(fmt, ...)    printf(fmt, ## __VA_ARGS__)
+@@ -156,10 +156,16 @@ int main()
+ 
+     if(check_results(vec_c, vec_sum, SIZE)) return -1;
+ 
+-    //execute the kernel
++    /* //execute the kernel
+     float dot_res = dotp(vec_a, vec_b, SIZE);
+     if( fabs(dot_res - dot_exp) > 0.0001f ) return -2;
+-
++ */
++    //execute the kernel — time the dot product in isolation
++    CSR_WRITE(CSR_REG_MCYCLE, 0);
++    float dot_res = dotp(vec_a, vec_b, SIZE);
++    CSR_READ(CSR_REG_MCYCLE, &cycles);
++    if( fabs(dot_res - dot_exp) > 0.0001f ) return -2;
++    PRINTF("dotp cycles = %u\n\r", cycles);
+ #ifdef ENABLE_PRINTF
+     print_vector(vec_c,SIZE);
+ #endif
+diff --git a/tb/tb_v5.vlt b/tb/tb_v5.vlt
+index d7a1be4..8ce1b39 100644
+--- a/tb/tb_v5.vlt
++++ b/tb/tb_v5.vlt
+@@ -3,5 +3,7 @@
+ // SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+ 
+ `verilator_config
+-
++// lint_off -rule COMBDLY -file "*cv32e40px_sim_clock_gate.sv"
+ lint_off -rule PROCASSINIT -file "*tb/yosys_spiflash.sv" -match "Procedural assignment to declaration with initial value: '*'"
++// lint_off -rule SYNCASYNCNET -file "*rstgen_bypass.sv"
++// lint_off -rule UNOPTFLAT    -file "*xbar_varlat_one_to_n.sv"
+diff --git a/tb/testharness.sv.tpl b/tb/testharness.sv.tpl
+index d4280a2..cc0892c 100644
+--- a/tb/testharness.sv.tpl
++++ b/tb/testharness.sv.tpl
+@@ -130,6 +130,22 @@ module testharness #(
+   logic dlc_xing_o;
+   logic dlc_dir_o;
+ 
++  // Custom accelerator signal (dma_sum_accel.sv)
++  logic accel_done;          // <-- YENİ
++  `ifdef COPROC_FPU_SHARE
++  // Coprocessor APU port (accel <-> shared FMA arbiter)
++  logic             accel_apu_req;
++  logic             accel_apu_gnt;
++  logic [2:0][31:0] accel_apu_operands;
++  logic [5:0]       accel_apu_op;
++  logic [14:0]      accel_apu_flags;
++  logic             accel_apu_rvalid;
++  logic [31:0]      accel_apu_rdata;
++  logic [4:0]       accel_apu_rflags;
++`endif
++
++
++
+   // External DMA slots
+   logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_slot_tx;
+   logic [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] ext_dma_slot_rx;
+@@ -380,10 +396,49 @@ module testharness #(
+       .ext_dma_slot_rx_i(ext_dma_slot_rx),
+       .ext_dma_stop_i('0),
+       .intr_ext_peripheral_i(gpio[31]),
+-      .hw_fifo_done_i({{(core_v_mini_mcu_pkg::DMA_CH_NUM - 1) {1'b0}}, dlc_done}),
++      .hw_fifo_done_i({{(core_v_mini_mcu_pkg::DMA_CH_NUM - 1) {1'b0}}, accel_done, dlc_done}),
+       .dma_done_o(dma_busy)
++                  `ifdef COPROC_FPU_SHARE
++        ,.apu_ext_req_i     (accel_apu_req)
++        ,.apu_ext_gnt_o     (accel_apu_gnt)
++        ,.apu_ext_operands_i(accel_apu_operands)
++        ,.apu_ext_op_i      (accel_apu_op)
++        ,.apu_ext_flags_i   (accel_apu_flags)
++        ,.apu_ext_rvalid_o  (accel_apu_rvalid)
++        ,.apu_ext_rdata_o   (accel_apu_rdata)
++        ,.apu_ext_rflags_o  (accel_apu_rflags)
++      `endif
++
++
++
++      
+   );
+ 
++    `ifdef COPROC_FPU_SHARE
++    // Y2: FP dot-product accelerator on DMA HW-FIFO channel 1, sharing the CPU's FMA
++  dma_fp_dot_accel_is #(.MAXN(1024)) dma_fp_dot_accel_i (
++      .clk_i         (clk_i),
++      .rst_ni        (rst_ni),
++      .hw_fifo_req_i (hw_fifo_req[1]),
++      .hw_fifo_resp_o(hw_fifo_resp[1]),
++      .done_o        (accel_done),
++      .fpu_req_o     (accel_apu_req),
++      .fpu_gnt_i     (accel_apu_gnt),
++      .fpu_operands_o(accel_apu_operands),
++      .fpu_op_o      (accel_apu_op),
++      .fpu_flags_o   (accel_apu_flags),
++      .fpu_rvalid_i  (accel_apu_rvalid),
++      .fpu_rdata_i   (accel_apu_rdata),
++      .fpu_rflags_i  (accel_apu_rflags)
++  );
++`else
++  // Baseline (stock X-HEEP): accel yok — kanal-1 HW-FIFO'yu sustur
++  assign accel_done      = 1'b0;
++  assign hw_fifo_resp[1] = '0;
++`endif
++
++
++
+   // Testbench external bus
+   // ----------------------
+   // The external bus connects the external peripherals among them and to
+diff --git a/tb/x-heep-tb-utils.core b/tb/x-heep-tb-utils.core
+index 247c850..d58bbf0 100644
+--- a/tb/x-heep-tb-utils.core
++++ b/tb/x-heep-tb-utils.core
+@@ -40,6 +40,9 @@ filesets:
+     - yosys_spiflash.sv
+     - testharness_pkg.sv
+     - testharness.sv
++    - dma_sum_accel.sv
++    - dma_fp_dot_accel.sv
++    - dma_fp_dot_accel_is.sv
+     - ext_xbar.sv
+     - ext_bus.sv
+     file_type: systemVerilogSource
+diff --git a/util/python-requirements.txt b/util/python-requirements.txt
+index 2655ea6..29dbcc6 100644
+--- a/util/python-requirements.txt
++++ b/util/python-requirements.txt
+@@ -1,7 +1,7 @@
+ gitpython==3.1.25
+ hjson==3.0.2
+ pyyaml==6.0.2
+-yamlfmt==1.1.0
++# yamlfmt==1.1.0
+ mako==1.1.6
+ jsonref==0.2
+ black==24.8.0
+diff --git a/util/waiver-gen.py b/util/waiver-gen.py
+index 3f85842..9d122dc 100644
+--- a/util/waiver-gen.py
++++ b/util/waiver-gen.py
+@@ -18,7 +18,7 @@ def get_verilator_major_version():
+             ["verilator", "--version"], capture_output=True, text=True, check=True
+         )
+         output = result.stdout
+-        match = re.search(r"rev v(\d+)\.\d+", output)
++        match = re.search(r"Verilator (\d+)\.\d+", output)
+ 
+         if not match:
+             print(
+diff --git a/util/xheep_gen/load_config.py b/util/xheep_gen/load_config.py
+index 458ab12..71f52fb 100644
+--- a/util/xheep_gen/load_config.py
++++ b/util/xheep_gen/load_config.py
+@@ -225,6 +225,8 @@ def load_cpu_config(
+     elif cpu_type_config == "cv32e40px":
+         cpu = cv32e40px(
+             fpu=cpu_features_config.get("fpu", None),
++            fpu_addmul_lat=cpu_features_config.get("fpu_addmul_lat", None),
++            fpu_others_lat=cpu_features_config.get("fpu_others_lat", None),
+             zfinx=cpu_features_config.get("zfinx", None),
+             corev_pulp=cpu_features_config.get("corev_pulp", None),
+         )

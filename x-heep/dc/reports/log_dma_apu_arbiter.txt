@@ -1,0 +1,860 @@
+
+                           Design Compiler Graphical 
+                                 DC Ultra (TM)
+                                  DFTMAX (TM)
+                              Power Compiler (TM)
+                                 DesignWare (R)
+                                 DC Expert (TM)
+                               Design Vision (TM)
+                               HDL Compiler (TM)
+                               VHDL Compiler (TM)
+                                  DFT Compiler
+                               Design Compiler(R)
+
+               Version S-2021.06-SP5 for linux64 - Jan 11, 2022 
+
+                    Copyright (c) 1988 - 2022 Synopsys, Inc.
+   This software and the associated documentation are proprietary to Synopsys,
+ Inc. This software may only be used in accordance with the terms and conditions
+ of a written license agreement with Synopsys, Inc. All other use, reproduction,
+   or distribution of this software is strictly prohibited.  Licensed Products
+     communicate with Synopsys servers for the purpose of providing software
+    updates, detecting software piracy and verifying that customers are using
+    Licensed Products in conformity with the applicable License Key for such
+  Licensed Products. Synopsys will use information gathered in connection with
+    this process to deliver software updates and pursue software pirates and
+                                   infringers.
+
+ Inclusivity & Diversity - Visit SolvNetPlus to read the "Synopsys Statement on
+            Inclusivity and Diversity" (Refer to article 000036315 at
+                        https://solvnetplus.synopsys.com)
+Initializing...
+#=============================================================================
+# Area synthesis of ONE module for the shared-FMA thesis (Design Compiler).
+#
+# Driven per-module by dc/run_area.sh (fresh dc_shell each -> zero state mixing).
+# You normally do NOT run this by hand; use:   bash dc/run_area.sh
+# To run a single module by hand:              TOP=dma_apu_arbiter dc_shell -f dc/synth_area.tcl
+#
+# Edit only LIB_DB below (once). TOP/CLK_NS come from the environment.
+#=============================================================================
+# ----------------------------- USER SETTING ---------------------------------
+set LIB_DB "./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db"
+./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db
+# ----------------------------------------------------------------------------
+set XHEEP  [pwd]
+/2tb/home/oyurtsever/x-heep
+set TOP    [expr {[info exists env(TOP)]    ? $env(TOP)    : "cv32e40px_fp_wrapper"}]
+dma_apu_arbiter
+set CLK_NS [expr {[info exists env(CLK_NS)] ? $env(CLK_NS) : 10.0}]
+10.0
+# GUARD: never silently fall back to gtech (which reports area = 0).
+if {![file exists $LIB_DB]} {
+    puts "FATAL: standard-cell library not found: $LIB_DB (run from x-heep root, fix LIB_DB)"
+    exit 1
+}
+# Per-TOP: filelist, analyze defines, elaborate params
+set FLIST   "dc/rtl_core.f"
+dc/rtl_core.f
+set DEFINES {SYNTHESIS}
+SYNTHESIS
+set PARAMS  ""
+switch $TOP {
+    dma_fp_dot_accel     { set FLIST "dc/rtl_accel.f" }
+    cv32e40px_fp_wrapper { }
+    dma_apu_arbiter      { }
+    cv32e40px_top        { set DEFINES {SYNTHESIS COPROC_FPU_SHARE}; set PARAMS "FPU=1" }
+    default              { }
+}
+# ------------------------------- library ------------------------------------
+set target_library    $LIB_DB
+./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db
+set synthetic_library "dw_foundation.sldb"
+dw_foundation.sldb
+set link_library      [concat "*" $LIB_DB $synthetic_library]
+* ./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db dw_foundation.sldb
+define_design_lib WORK -path ./dc/work/$TOP          ;# per-TOP work dir -> no clash
+1
+set search_path [concat $search_path \
+    $XHEEP/hw/vendor/pulp_platform/common_cells/include \
+    $XHEEP/hw/vendor/pulp_platform/register_interface/include ]
+. /eda/synopsys/syn/S-2021.06-SP5/libraries/syn /eda/synopsys/syn/S-2021.06-SP5/dw/syn_ver /eda/synopsys/syn/S-2021.06-SP5/dw/sim_ver /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/register_interface/include
+file mkdir dc/reports
+# ------------------------------ read RTL ------------------------------------
+set fh [open $XHEEP/$FLIST r]
+file14
+set files {}
+foreach line [split [read $fh] "\n"] {
+    set line [string trim $line]
+    if {$line ne "" && ![string match "#*" $line]} { lappend files $XHEEP/$line }
+}
+close $fh
+analyze -format sverilog -define $DEFINES $files
+Running PRESTO HDLC
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cb_filter_pkg.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cf_math_pkg.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/ecc_pkg.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_reset_ctrlr_pkg.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_pkg.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/include/cv32e40px_apu_core_pkg.sv
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_pkg.sv:359: signed to unsigned assignment occurs. (VER-318)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_pkg.sv:360: signed to unsigned conversion occurs. (VER-318)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_pkg.sv:490: signed to unsigned assignment occurs. (VER-318)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/include/cv32e40px_apu_core_pkg.sv:25: Parameter keyword used in local parameter declaration. (VER-329)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/include/cv32e40px_fpu_pkg.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/include/cv32e40px_pkg.sv
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/include/cv32e40px_pkg.sv:37: Parameter keyword used in local parameter declaration. (VER-329)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/include/cv32e40px_core_v_xif_pkg.sv
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/include/cv32e40px_core_v_xif_pkg.sv:17: Parameter keyword used in local parameter declaration. (VER-329)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/binary_to_gray.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cc_onehot.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/clk_int_div.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/clk_int_div_static.sv
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/clk_int_div.sv:111: Invalid escape sequence '\0' in call to '$error'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/clk_int_div.sv:111: Invalid escape sequence '\0' in call to '$error'. (VER-941)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/credit_counter.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/delta_counter.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/edge_propagator_tx.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/exp_backoff.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/fifo_v3.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/gray_to_binary.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/isochronous_4phase_handshake.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/isochronous_spill_register.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/lfsr.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/lfsr_16bit.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/lfsr_8bit.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/multiaddr_decode.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/mv_filter.sv
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/multiaddr_decode.sv:126: The statements in initial blocks are ignored. (VER-281)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/onehot_to_bin.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/plru_tree.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/passthrough_stream_fifo.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/popcount.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/rr_arb_tree.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/rstgen_bypass.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/serial_deglitch.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/shift_reg.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/shift_reg_gated.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/spill_register_flushable.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_demux.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_filter.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_fork.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_intf.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_join.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_join_dynamic.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_mux.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_throttle.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/sub_per_hash.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/sync.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/sync_wedge.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/unread.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/read.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/addr_decode_dync.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_2phase.sv
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/addr_decode_dync.sv:128: The statements in initial blocks are ignored. (VER-281)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_4phase.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cb_filter.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_fifo_2phase.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cb_filter.sv:242: The statements in initial blocks are ignored. (VER-281)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/counter.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/ecc_decode.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/ecc_encode.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/edge_detect.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/lzc.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/max_counter.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/rstgen.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/spill_register.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_delay.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_fifo.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_fork_dynamic.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/clk_mux_glitch_free.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/addr_decode.sv
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/clk_mux_glitch_free.sv:264: Invalid escape sequence '\0' in call to '$error'. (VER-941)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/addr_decode_napot.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_reset_ctrlr.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_fifo_gray.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/fall_through_register.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/id_queue.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_to_mem.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_arbiter_flushable.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_fifo_optimal_wrap.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_register.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_xbar.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_fifo_gray_clearable.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_fifo_gray_clearable.sv:165: Invalid escape sequence '\0' in call to '$warning'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_fifo_gray_clearable.sv:165: Invalid escape sequence '\0' in call to '$warning'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_fifo_gray_clearable.sv:165: Invalid escape sequence '\0' in call to '$warning'. (VER-941)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/cdc_2phase_clearable.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/mem_to_banks_detailed.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_arbiter.sv
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/mem_to_banks_detailed.sv:224: The statements in initial blocks are ignored. (VER-281)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/assertions.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/mem_to_banks.sv
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:149: Invalid escape sequence '\0' in call to '$display'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:150: Invalid escape sequence '\0' in call to '$display'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:259: Invalid escape sequence '\0' in call to '$display'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:260: Invalid escape sequence '\0' in call to '$display'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:261: Invalid escape sequence '\0' in call to '$display'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:262: Invalid escape sequence '\0' in call to '$display'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:263: Invalid escape sequence '\0' in call to '$display'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:264: Invalid escape sequence '\0' in call to '$display'. (VER-941)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:148: The statements in initial blocks are ignored. (VER-281)
+Warning:  /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/stream_omega_net.sv:258: The statements in initial blocks are ignored. (VER-281)
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/clock_divider_counter.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/clk_div.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/find_first_one.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/generic_LFSR_8bit.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/generic_fifo.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/prioarbiter.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/pulp_sync.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/pulp_sync_wedge.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/rrarbiter.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/clock_divider.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/fifo_v2.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/deprecated/fifo_v1.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/edge_propagator_ack.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/edge_propagator.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/src/edge_propagator_rx.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_cast_multi.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_classifier.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_divsqrt_multi.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_fma.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_fma_multi.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_noncomp.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_opgroup_block.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_opgroup_fmt_slice.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_opgroup_multifmt_slice.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_rounding.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_top.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/src/fpnew_divsqrt_th_32.sv
+Opening include file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/common_cells/include/common_cells/registers.svh
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/clk/rtl/gated_clk_cell.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ctrl.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ff1.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_pack_single.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_prepare.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_round_single.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_special.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_srt_single.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_top.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_dp.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_frbus.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/pulp_platform/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_src_type.v
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_alu.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_alu_div.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_ff_one.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_popcnt.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_compressed_decoder.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_controller.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_cs_registers.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_decoder.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_int_controller.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_ex_stage.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_hwloop_regs.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_id_stage.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_if_stage.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_load_store_unit.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_mult.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_prefetch_buffer.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_prefetch_controller.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_obi_interface.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_aligner.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_sleep_unit.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_core.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_apu_disp.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_x_disp.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_fifo.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_fp_wrapper.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/dma_apu_arbiter.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_top.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_register_file_ff.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/bhv/cv32e40px_sim_clock_gate.sv
+Compiling source file /2tb/home/oyurtsever/x-heep/hw/core-v-mini-mcu/cv32e40px_xif_wrapper.sv
+Presto compilation completed successfully.
+Loading db file '/2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db'
+Loading db file '/eda/synopsys/syn/S-2021.06-SP5/libraries/syn/dw_foundation.sldb'
+1
+if {$PARAMS ne ""} { elaborate $TOP -parameters $PARAMS } else { elaborate $TOP }
+Loading db file '/eda/synopsys/syn/S-2021.06-SP5/libraries/syn/gtech.db'
+Loading db file '/eda/synopsys/syn/S-2021.06-SP5/libraries/syn/standard.sldb'
+  Loading link library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c'
+  Loading link library 'gtech'
+Running PRESTO HDLC
+
+Inferred memory devices in process
+	in routine dma_apu_arbiter line 77 in file
+		'/2tb/home/oyurtsever/x-heep/hw/vendor/xheep/cv32e40px/rtl/dma_apu_arbiter.sv'.
+===============================================================================
+|    Register Name    |   Type    | Width | Bus | MB | AR | AS | SR | SS | ST |
+===============================================================================
+|     owner_q_reg     | Flip-flop |   1   |  N  | N  | Y  | N  | N  | N  | N  |
+|   inflight_q_reg    | Flip-flop |   3   |  Y  | N  | Y  | N  | N  | N  | N  |
+===============================================================================
+Presto compilation completed successfully. (dma_apu_arbiter)
+Elaborated 1 design.
+Current design is now 'dma_apu_arbiter'.
+1
+current_design $TOP
+Current design is 'dma_apu_arbiter'.
+{dma_apu_arbiter}
+link
+
+  Linking design 'dma_apu_arbiter'
+  Using the following designs and libraries:
+  --------------------------------------------------------------------------
+  dma_apu_arbiter             /2tb/home/oyurtsever/x-heep/dma_apu_arbiter.db
+  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c (library) /2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db
+  dw_foundation.sldb (library) /eda/synopsys/syn/S-2021.06-SP5/libraries/syn/dw_foundation.sldb
+
+1
+check_design
+ 
+****************************************
+check_design summary:
+Version:     S-2021.06-SP5
+Date:        Sun Jul  5 15:21:32 2026
+****************************************
+
+                   Name                                            Total
+--------------------------------------------------------------------------------
+Inputs/Outputs                                                    111
+    Feedthrough (LINT-29)                                          74
+    Shorted outputs (LINT-31)                                      37
+
+Cells                                                               1
+    Cells do not drive (LINT-1)                                     1
+--------------------------------------------------------------------------------
+
+Warning: In design 'dma_apu_arbiter', cell 'B_3' does not drive any nets. (LINT-1)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[31]' is connected directly to output port 'dma_rdata_o[31]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[31]' is connected directly to output port 'cpu_rdata_o[31]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[30]' is connected directly to output port 'dma_rdata_o[30]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[30]' is connected directly to output port 'cpu_rdata_o[30]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[29]' is connected directly to output port 'dma_rdata_o[29]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[29]' is connected directly to output port 'cpu_rdata_o[29]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[28]' is connected directly to output port 'dma_rdata_o[28]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[28]' is connected directly to output port 'cpu_rdata_o[28]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[27]' is connected directly to output port 'dma_rdata_o[27]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[27]' is connected directly to output port 'cpu_rdata_o[27]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[26]' is connected directly to output port 'dma_rdata_o[26]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[26]' is connected directly to output port 'cpu_rdata_o[26]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[25]' is connected directly to output port 'dma_rdata_o[25]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[25]' is connected directly to output port 'cpu_rdata_o[25]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[24]' is connected directly to output port 'dma_rdata_o[24]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[24]' is connected directly to output port 'cpu_rdata_o[24]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[23]' is connected directly to output port 'dma_rdata_o[23]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[23]' is connected directly to output port 'cpu_rdata_o[23]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[22]' is connected directly to output port 'dma_rdata_o[22]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[22]' is connected directly to output port 'cpu_rdata_o[22]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[21]' is connected directly to output port 'dma_rdata_o[21]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[21]' is connected directly to output port 'cpu_rdata_o[21]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[20]' is connected directly to output port 'dma_rdata_o[20]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[20]' is connected directly to output port 'cpu_rdata_o[20]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[19]' is connected directly to output port 'dma_rdata_o[19]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[19]' is connected directly to output port 'cpu_rdata_o[19]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[18]' is connected directly to output port 'dma_rdata_o[18]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[18]' is connected directly to output port 'cpu_rdata_o[18]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[17]' is connected directly to output port 'dma_rdata_o[17]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[17]' is connected directly to output port 'cpu_rdata_o[17]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[16]' is connected directly to output port 'dma_rdata_o[16]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[16]' is connected directly to output port 'cpu_rdata_o[16]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[15]' is connected directly to output port 'dma_rdata_o[15]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[15]' is connected directly to output port 'cpu_rdata_o[15]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[14]' is connected directly to output port 'dma_rdata_o[14]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[14]' is connected directly to output port 'cpu_rdata_o[14]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[13]' is connected directly to output port 'dma_rdata_o[13]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[13]' is connected directly to output port 'cpu_rdata_o[13]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[12]' is connected directly to output port 'dma_rdata_o[12]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[12]' is connected directly to output port 'cpu_rdata_o[12]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[11]' is connected directly to output port 'dma_rdata_o[11]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[11]' is connected directly to output port 'cpu_rdata_o[11]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[10]' is connected directly to output port 'dma_rdata_o[10]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[10]' is connected directly to output port 'cpu_rdata_o[10]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[9]' is connected directly to output port 'dma_rdata_o[9]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[9]' is connected directly to output port 'cpu_rdata_o[9]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[8]' is connected directly to output port 'dma_rdata_o[8]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[8]' is connected directly to output port 'cpu_rdata_o[8]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[7]' is connected directly to output port 'dma_rdata_o[7]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[7]' is connected directly to output port 'cpu_rdata_o[7]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[6]' is connected directly to output port 'dma_rdata_o[6]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[6]' is connected directly to output port 'cpu_rdata_o[6]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[5]' is connected directly to output port 'dma_rdata_o[5]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[5]' is connected directly to output port 'cpu_rdata_o[5]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[4]' is connected directly to output port 'dma_rdata_o[4]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[4]' is connected directly to output port 'cpu_rdata_o[4]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[3]' is connected directly to output port 'dma_rdata_o[3]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[3]' is connected directly to output port 'cpu_rdata_o[3]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[2]' is connected directly to output port 'dma_rdata_o[2]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[2]' is connected directly to output port 'cpu_rdata_o[2]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[1]' is connected directly to output port 'dma_rdata_o[1]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[1]' is connected directly to output port 'cpu_rdata_o[1]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[0]' is connected directly to output port 'dma_rdata_o[0]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rdata_i[0]' is connected directly to output port 'cpu_rdata_o[0]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[4]' is connected directly to output port 'dma_rflags_o[4]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[4]' is connected directly to output port 'cpu_rflags_o[4]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[3]' is connected directly to output port 'dma_rflags_o[3]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[3]' is connected directly to output port 'cpu_rflags_o[3]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[2]' is connected directly to output port 'dma_rflags_o[2]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[2]' is connected directly to output port 'cpu_rflags_o[2]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[1]' is connected directly to output port 'dma_rflags_o[1]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[1]' is connected directly to output port 'cpu_rflags_o[1]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[0]' is connected directly to output port 'dma_rflags_o[0]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', input port 'fpu_rflags_i[0]' is connected directly to output port 'cpu_rflags_o[0]'. (LINT-29)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[31]' is connected directly to output port 'dma_rdata_o[31]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[30]' is connected directly to output port 'dma_rdata_o[30]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[29]' is connected directly to output port 'dma_rdata_o[29]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[28]' is connected directly to output port 'dma_rdata_o[28]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[27]' is connected directly to output port 'dma_rdata_o[27]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[26]' is connected directly to output port 'dma_rdata_o[26]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[25]' is connected directly to output port 'dma_rdata_o[25]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[24]' is connected directly to output port 'dma_rdata_o[24]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[23]' is connected directly to output port 'dma_rdata_o[23]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[22]' is connected directly to output port 'dma_rdata_o[22]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[21]' is connected directly to output port 'dma_rdata_o[21]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[20]' is connected directly to output port 'dma_rdata_o[20]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[19]' is connected directly to output port 'dma_rdata_o[19]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[18]' is connected directly to output port 'dma_rdata_o[18]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[17]' is connected directly to output port 'dma_rdata_o[17]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[16]' is connected directly to output port 'dma_rdata_o[16]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[15]' is connected directly to output port 'dma_rdata_o[15]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[14]' is connected directly to output port 'dma_rdata_o[14]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[13]' is connected directly to output port 'dma_rdata_o[13]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[12]' is connected directly to output port 'dma_rdata_o[12]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[11]' is connected directly to output port 'dma_rdata_o[11]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[10]' is connected directly to output port 'dma_rdata_o[10]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[9]' is connected directly to output port 'dma_rdata_o[9]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[8]' is connected directly to output port 'dma_rdata_o[8]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[7]' is connected directly to output port 'dma_rdata_o[7]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[6]' is connected directly to output port 'dma_rdata_o[6]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[5]' is connected directly to output port 'dma_rdata_o[5]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[4]' is connected directly to output port 'dma_rdata_o[4]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[3]' is connected directly to output port 'dma_rdata_o[3]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[2]' is connected directly to output port 'dma_rdata_o[2]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[1]' is connected directly to output port 'dma_rdata_o[1]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rdata_o[0]' is connected directly to output port 'dma_rdata_o[0]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rflags_o[4]' is connected directly to output port 'dma_rflags_o[4]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rflags_o[3]' is connected directly to output port 'dma_rflags_o[3]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rflags_o[2]' is connected directly to output port 'dma_rflags_o[2]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rflags_o[1]' is connected directly to output port 'dma_rflags_o[1]'. (LINT-31)
+Warning: In design 'dma_apu_arbiter', output port 'cpu_rflags_o[0]' is connected directly to output port 'dma_rflags_o[0]'. (LINT-31)
+1
+uniquify
+1
+# ----------------------------- constraints ----------------------------------
+create_clock -name clk -period $CLK_NS [get_ports clk_i]
+1
+set_max_area 0
+1
+# ----------------------------- synthesize -----------------------------------
+compile_ultra
+Information: Performing power optimization. (PWR-850)
+Alib files are up-to-date.
+Information: Evaluating DesignWare library utilization. (UISN-27)
+
+============================================================================
+| DesignWare Building Block Library  |         Version         | Available |
+============================================================================
+| Basic DW Building Blocks           | S-2021.06-DWBB_202106.5 |     *     |
+| Licensed DW Building Blocks        | S-2021.06-DWBB_202106.5 |     *     |
+============================================================================
+
+============================================================================
+| Flow Information                                                         |
+----------------------------------------------------------------------------
+| Flow         | Design Compiler WLM                                       |
+============================================================================
+| Design Information                                      | Value          |
+============================================================================
+| Number of Scenarios                                     | 0              |
+| Leaf Cell Count                                         | 42             |
+| Number of User Hierarchies                              | 0              |
+| Sequential Cell Count                                   | 4              |
+| Macro Count                                             | 0              |
+| Number of Power Domains                                 | 0              |
+| Design with UPF Data                                    | false          |
+============================================================================
+Information: Sequential output inversion is enabled.  SVF file must be used for formal verification. (OPT-1208)
+
+Information: There are 112 potential problems in your design. Please run 'check_design' for more information. (LINT-99)
+
+  Simplifying Design 'dma_apu_arbiter'
+
+Loaded alib file './alib-52/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db.alib'
+  Building model 'DW01_NAND2'
+Information: Ungrouping 0 of 1 hierarchies before Pass 1 (OPT-775)
+Information: State dependent leakage is now switched from on to off.
+
+  Beginning Pass 1 Mapping
+  ------------------------
+  Processing 'dma_apu_arbiter'
+Information: Added key list 'DesignWare' to design 'dma_apu_arbiter'. (DDB-72)
+
+  Updating timing information
+Information: Updating design information... (UID-85)
+Information: The library cell 'TIELO_X1M_A12TR40' in the library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c' is not characterized for internal power. (PWR-536)
+Information: The library cell 'TIEHI_X1M_A12TR40' in the library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c' is not characterized for internal power. (PWR-536)
+Information: The target library(s) contains cell(s), other than black boxes, that are not characterized for internal power. (PWR-24)
+
+  Beginning Mapping Optimizations  (Ultra High effort)
+  -------------------------------
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:06     458.7      0.00       0.0       0.0                             13.0043
+    0:00:06     458.7      0.00       0.0       0.0                             13.0043
+
+  Beginning Constant Register Removal
+  -----------------------------------
+    0:00:07     458.7      0.00       0.0       0.0                             13.0043
+    0:00:07     458.7      0.00       0.0       0.0                             13.0043
+
+  Beginning Global Optimizations
+  ------------------------------
+  Numerical Synthesis (Phase 1)
+  Numerical Synthesis (Phase 2)
+  Global Optimization (Phase 1)
+  Global Optimization (Phase 2)
+  Global Optimization (Phase 3)
+  Global Optimization (Phase 4)
+  Global Optimization (Phase 5)
+  Global Optimization (Phase 6)
+  Global Optimization (Phase 7)
+  Global Optimization (Phase 8)
+  Global Optimization (Phase 9)
+  Global Optimization (Phase 10)
+  Global Optimization (Phase 11)
+  Global Optimization (Phase 12)
+  Global Optimization (Phase 13)
+  Global Optimization (Phase 14)
+  Global Optimization (Phase 15)
+  Global Optimization (Phase 16)
+  Global Optimization (Phase 17)
+  Global Optimization (Phase 18)
+  Global Optimization (Phase 19)
+  Global Optimization (Phase 20)
+  Global Optimization (Phase 21)
+  Global Optimization (Phase 22)
+  Global Optimization (Phase 23)
+  Global Optimization (Phase 24)
+  Global Optimization (Phase 25)
+  Global Optimization (Phase 26)
+  Global Optimization (Phase 27)
+  Global Optimization (Phase 28)
+  Global Optimization (Phase 29)
+  Global Optimization (Phase 30)
+
+  Beginning Isolate Ports
+  -----------------------
+
+  Beginning Delay Optimization
+  ----------------------------
+    0:00:07     326.2      0.00       0.0      43.9                              5.8144
+    0:00:07     326.2      0.00       0.0      43.9                              5.8144
+    0:00:07     326.2      0.00       0.0      43.9                              5.8144
+    0:00:07     326.2      0.00       0.0      43.9                              5.8144
+    0:00:07     326.2      0.00       0.0      43.9                              5.8144
+    0:00:07     326.2      0.00       0.0      43.9                              5.8144
+
+  Beginning WLM Backend Optimization
+  --------------------------------------
+    0:00:08     322.7      0.00       0.0      22.5                              5.6962
+    0:00:08     322.7      0.00       0.0      22.5                              5.6962
+    0:00:08     322.7      0.00       0.0      22.5                              5.6962
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+
+
+  Beginning Leakage Power Optimization  (max_leakage_power 0)
+  ------------------------------------
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:08     322.7      0.00       0.0       0.0                              3.1909
+  Global Optimization (Phase 31)
+  Global Optimization (Phase 32)
+  Global Optimization (Phase 33)
+  Global Optimization (Phase 34)
+  Global Optimization (Phase 35)
+  Global Optimization (Phase 36)
+  Global Optimization (Phase 37)
+  Global Optimization (Phase 38)
+  Global Optimization (Phase 39)
+  Global Optimization (Phase 40)
+  Global Optimization (Phase 41)
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:08     322.7      0.00       0.0       0.0                              3.1712
+    0:00:08     322.1      0.00       0.0       0.0                              3.1866
+    0:00:08     322.1      0.00       0.0       0.0                              3.1866
+    0:00:08     322.1      0.00       0.0       0.0                              3.1866
+    0:00:09     322.1      0.00       0.0       0.0                              3.1824
+    0:00:09     321.4      0.00       0.0       0.0                              3.1788
+    0:00:09     321.4      0.00       0.0       0.0                              3.1788
+    0:00:09     321.4      0.00       0.0       0.0                              3.1788
+    0:00:09     321.4      0.00       0.0       0.0                              3.1788
+    0:00:09     321.4      0.00       0.0       0.0                              3.1788
+    0:00:09     321.4      0.00       0.0       0.0                              3.1788
+Loading db file '/2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db'
+
+
+Note: Symbol # after min delay cost means estimated hold TNS across all active scenarios 
+
+
+  Optimization Complete
+  ---------------------
+Information: State dependent leakage is now switched from off to on.
+Information: Propagating switching activity (low effort zero delay simulation). (PWR-6)
+1
+compile_ultra -incremental
+Information: Performing power optimization. (PWR-850)
+Alib files are up-to-date.
+============================================================================
+| Flow Information                                                         |
+----------------------------------------------------------------------------
+| Flow         | Design Compiler                                           |
+============================================================================
+| Design Information                                      | Value          |
+============================================================================
+| Number of Scenarios                                     | 0              |
+| Leaf Cell Count                                         | 153            |
+| Number of User Hierarchies                              | 0              |
+| Sequential Cell Count                                   | 4              |
+| Macro Count                                             | 0              |
+| Number of Power Domains                                 | 0              |
+| Design with UPF Data                                    | false          |
+============================================================================
+
+Information: There are 111 potential problems in your design. Please run 'check_design' for more information. (LINT-99)
+
+
+Information: State dependent leakage is now switched from on to off.
+
+  Beginning Pass 1 Mapping  (Incremental)
+  ------------------------
+
+  Updating timing information
+Information: Updating design information... (UID-85)
+Information: The library cell 'TIELO_X1M_A12TR40' in the library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c' is not characterized for internal power. (PWR-536)
+Information: The library cell 'TIEHI_X1M_A12TR40' in the library 'sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c' is not characterized for internal power. (PWR-536)
+Information: The target library(s) contains cell(s), other than black boxes, that are not characterized for internal power. (PWR-24)
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:02     321.4      0.00       0.0       0.0                              3.1788
+    0:00:02     321.4      0.00       0.0       0.0                              3.1788
+
+  Beginning Mapping Optimizations  (Ultra High effort)  (Incremental)
+  -------------------------------
+
+  Beginning Incremental Implementation Selection
+  ----------------------------------------------
+    0:00:03     321.4      0.00       0.0       0.0                              3.1788
+    0:00:03     321.4      0.00       0.0       0.0                              3.1788
+    0:00:03     321.4      0.00       0.0       0.0                              3.1788
+    0:00:03     321.4      0.00       0.0       0.0                              3.1788
+  Global Optimization (Phase 42)
+  Global Optimization (Phase 43)
+  Global Optimization (Phase 44)
+  Global Optimization (Phase 45)
+
+
+
+  Beginning Delay Optimization Phase
+  ----------------------------------
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:03     321.4      0.00       0.0       0.0                              3.1788
+    0:00:03     321.4      0.00       0.0       0.0                              3.1788
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+
+  Beginning Delay Optimization
+  ----------------------------
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+
+
+  Beginning Leakage Power Optimization  (max_leakage_power 0)
+  ------------------------------------
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:03     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+
+                                  TOTAL                                                
+   ELAPSED            WORST NEG   SETUP    DESIGN                              LEAKAGE 
+    TIME      AREA      SLACK     COST    RULE COST         ENDPOINT            POWER  
+  --------- --------- --------- --------- --------- ------------------------- ---------
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1687
+    0:00:04     321.4      0.00       0.0       0.0                              3.1555
+    0:00:04     321.4      0.00       0.0       0.0                              3.1555
+    0:00:04     321.4      0.00       0.0       0.0                              3.1555
+    0:00:04     321.4      0.00       0.0       0.0                              3.1555
+Loading db file '/2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db'
+
+
+Note: Symbol # after min delay cost means estimated hold TNS across all active scenarios 
+
+
+  Optimization Complete
+  ---------------------
+Information: State dependent leakage is now switched from off to on.
+Information: Propagating switching activity (low effort zero delay simulation). (PWR-6)
+1
+# ------------------------------- reports ------------------------------------
+report_area -hierarchy > dc/reports/area_${TOP}_hier.rpt
+report_area            > dc/reports/area_${TOP}.rpt
+report_reference       > dc/reports/refs_${TOP}.rpt
+report_timing          > dc/reports/timing_${TOP}.rpt
+set A [get_attribute [current_design] area]
+Current design is 'dma_apu_arbiter'.
+Warning: Attribute 'area' does not exist on design 'dma_apu_arbiter'. (UID-101)
+set F [sizeof_collection [all_registers]]
+4
+# GUARD: 0 area means unmapped (library not applied) -> shout, don't fail silently.
+if {$A == 0} {
+    puts "!!!!!! $TOP : area = 0  -> design UNMAPPED (check library). See log. !!!!!!"
+} else {
+    puts "==== $TOP : Total cell area = $A , FFs = $F ===="
+}
+==== dma_apu_arbiter : Total cell area =  , FFs = 4 ====
+exit
+
+Memory usage for this session 370 Mbytes.
+Memory usage for this session including child processes 370 Mbytes.
+CPU usage for this session 23 seconds ( 0.01 hours ).
+Elapsed time for this session 24 seconds ( 0.01 hours ).
+
+Thank you...

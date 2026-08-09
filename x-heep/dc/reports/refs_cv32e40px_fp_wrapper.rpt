@@ -1,0 +1,266 @@
+ 
+****************************************
+Report : reference
+Design : cv32e40px_fp_wrapper
+Version: S-2021.06-SP5
+Date   : Sun Jul  5 15:21:26 2026
+****************************************
+
+Attributes:
+    b - black box (unknown)
+   bo - allows boundary optimization
+    d - dont_touch
+   mo - map_only
+    h - hierarchical
+    n - noncombinational
+    r - removable
+    s - synthetic operator
+    u - contains unmapped logic
+
+Reference          Library       Unit Area   Count    Total Area   Attributes
+-----------------------------------------------------------------------------
+ADDF_X1M_A12TR40   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  5.107200      64    326.860809  r
+ADDH_X1M_A12TR40   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  3.192000       9     28.727999  r
+AND2_X0P5B_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800      20     25.536001  
+AND2_X1B_A12TR40   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       1      1.276800  
+AND3_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000       3      4.788000  
+AND4_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       2      3.830400  
+AO1B2_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000      30     47.879999  
+AO21A1AI2_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200      29     55.540800  
+AO21_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200      12     22.982400  
+AO21_X0P7M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       1      1.915200  
+AO22_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400      18     40.219201  
+AOI2XB1_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       8     15.321600  
+AOI21B_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       5      9.576000  
+AOI21_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800     145    185.136005  
+AOI21_X0P7M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       4      5.107200  
+AOI21_X1M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       1      1.276800  
+AOI21_X1P4M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400       1      2.234400  
+AOI22BB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400      64    143.001602  
+AOI22_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000     574    916.103975  
+AOI31_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000      27     43.091999  
+AOI32_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       5      9.576000  
+AOI211_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000     134    213.863994  
+AOI221_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400       4      8.937600  
+AOI222_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.553600      20     51.072001  
+BUF_X0P7B_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       4      3.830400  
+CGENI_X1M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200      45     86.184000  
+CGEN_X1M_A12TR40   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400       3      6.703200  
+DFFQ_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  4.788000     238   1139.544025  n
+DFFRPQN_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  5.745600       1      5.745600  n
+DFFRPQ_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  5.745600      60    344.736013  n
+INV_X0P5B_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.638400     470    300.048009  
+INV_X0P6B_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.638400       4      2.553600  
+INV_X0P7B_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.638400       6      3.830400  
+INV_X0P8B_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.638400       4      2.553600  
+INV_X1B_A12TR40    sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.638400       4      2.553600  
+INV_X1P2B_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       1      0.957600  
+INV_X1P4B_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       1      0.957600  
+INV_X1P7B_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       1      0.957600  
+MXIT2_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.553600       2      5.107200  
+NAND2B_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800      27     34.473601  
+NAND2XB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       1      1.276800  
+NAND2XB_X0P7M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       1      1.276800  
+NAND2_X0P5B_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       8      7.660800  
+NAND2_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600     401    383.997599  
+NAND2_X0P7A_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       1      0.957600  
+NAND2_X0P7B_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       1      0.957600  
+NAND2_X1P4B_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000       1      1.596000  
+NAND3BB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000       6      9.576000  
+NAND3XXB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000       2      3.192000  
+NAND3_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800      51     65.116802  
+NAND4BB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400       3      6.703200  
+NAND4XXXB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200      17     32.558400  
+NAND4_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000      66    105.335997  
+NOR2B_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800      20     25.536001  
+NOR2B_X0P7M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       1      1.276800  
+NOR2B_X1M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       1      1.276800  
+NOR2XB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       1      1.276800  
+NOR2_X0P5B_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600      11     10.533600  
+NOR2_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600     267    255.679199  
+NOR2_X0P7B_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       8      7.660800  
+NOR2_X1B_A12TR40   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       7      6.703200  
+NOR3BB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000       4      6.384000  
+NOR3_X0P5A_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800      58     74.054402  
+NOR3_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       1      1.276800  
+NOR3_X1P4M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400       1      2.234400  
+NOR4BB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200      16     30.643200  
+OA1B2_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000       8     12.768000  
+OA21A1OI2_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200      26     49.795200  
+OA21_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       2      3.830400  
+OA21_X0P7M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       1      1.915200  
+OA22_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400      22     49.156801  
+OA211_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400       1      2.234400  
+OAI2XB1_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       4      7.660800  
+OAI21_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800     220    280.896008  
+OAI22BB_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400      29     64.797601  
+OAI22_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000     221    352.715990  
+OAI22_X0P7M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000       4      6.384000  
+OAI31_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000      50     79.799998  
+OAI31_X1M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000       3      4.788000  
+OAI211_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000     185    295.259992  
+OAI211_X0P7M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.596000       1      1.596000  
+OAI221_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400      27     60.328801  
+OAI222_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.553600      18     45.964801  
+OR2_X0P5B_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800      23     29.366401  
+OR2_X1B_A12TR40    sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.276800       1      1.276800  
+OR3_X0P5M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       1      1.915200  
+OR3_X0P7M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  1.915200       1      1.915200  
+OR4_X0P5M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.553600       1      2.553600  
+TIEHI_X1M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       1      0.957600  
+TIELO_X1M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  0.957600       1      0.957600  
+XNOR2_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.553600      12     30.643201  
+XNOR2_X1M_A12TR40  sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.553600       1      2.553600  
+XNOR3_X0P5M_A12TR40
+                   sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  4.149600       2      8.299200  
+XOR2_X0P5M_A12TR40 sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c
+                                  2.234400      34     75.969601  
+fpnew_fma_multi_10_00000000_1__logic_Z_1yB__790242
+                               5822.846428       1   5822.846428  h
+pa_fdsu_ff1                     363.568795       1    363.568795  h
+-----------------------------------------------------------------------------
+Total 96 references                                 12812.049651
+1
