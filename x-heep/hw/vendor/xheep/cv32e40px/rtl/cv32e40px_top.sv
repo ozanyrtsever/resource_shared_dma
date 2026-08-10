@@ -248,6 +248,8 @@ module cv32e40px_top
       logic                             w_apu_rvalid;
       logic [                31:0]       w_apu_rdata;
       logic [APU_NUSFLAGS_CPU-1:0]       w_apu_rflags;
+      logic                              w_apu_tag;
+      logic                              w_apu_rtag;
 
 `ifdef COPROC_FPU_SHARE
       // ---- Shared-FPU CPU-priority arbiter (tez katkısı) ----
@@ -279,10 +281,12 @@ module cv32e40px_top
           .fpu_gnt_i     (w_apu_gnt),
           .fpu_operands_o(w_apu_operands),
           .fpu_op_o      (w_apu_op),
+          .fpu_tag_o     (w_apu_tag),
           .fpu_flags_o   (w_apu_flags),
           .fpu_rvalid_i  (w_apu_rvalid),
           .fpu_rdata_i   (w_apu_rdata),
           .fpu_rflags_i  (w_apu_rflags),
+          .fpu_tag_i     (w_apu_rtag),
           .fma_active_o  (fma_active)
       );
       assign apu_clk_en = apu_req | apu_busy | fma_active;
@@ -296,6 +300,7 @@ module cv32e40px_top
       assign apu_rvalid     = w_apu_rvalid;
       assign apu_rdata      = w_apu_rdata;
       assign apu_rflags     = w_apu_rflags;
+      assign w_apu_tag      = 1'b0; // unused
       assign apu_clk_en     = apu_req | apu_busy;
 `endif
 
@@ -321,7 +326,9 @@ module cv32e40px_top
           .apu_flags_i   (w_apu_flags),
           .apu_rvalid_o  (w_apu_rvalid),
           .apu_rdata_o   (w_apu_rdata),
-          .apu_rflags_o  (w_apu_rflags)
+          .apu_rflags_o  (w_apu_rflags),
+          .apu_tag_i     (w_apu_tag),
+          .apu_tag_o     (w_apu_rtag)
       );
 
 

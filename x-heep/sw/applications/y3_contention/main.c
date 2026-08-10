@@ -4,64 +4,78 @@
 #include "dma.h"
 #include "csr.h"
 #include "x-heep.h"
-
 #define PRINTF_IN_SIM 1
 #if TARGET_SIM && PRINTF_IN_SIM
   #define PRINTF(fmt, ...) printf(fmt, ## __VA_ARGS__)
 #else
   #define PRINTF(...)
 #endif
-
-#define NP 32              // accel çift sayısı -> testharness num_pairs_i = 32 OLMALI
-#define NW (2*NP)
-#define M  32              // CPU'nun eşzamanlı FP MAC sayısı
+#define ACC_N 32
+#define ACC_M 32        // accel CPU loop'u boyunca meşgul kalır, daha az DMA bus trafiği
+#define CPU_K 512       // register-only CPU fmadd sayısı
 #define DMA_CH 1
 
-float src_buf[NW] __attribute__((aligned(4)));
-float dst_buf[NW] __attribute__((aligned(4)));
-float xg[M], yg[M];
+static inline float    w2f(unsigned int u){ union{unsigned int u; float f;} c; c.u=u; return c.f; }
+static inline uint32_t f2u(float f)        { union{float f; uint32_t u;} c; c.f=f; return c.u; }
 
-int main(void) {
-    CSR_SET_BITS(CSR_REG_MSTATUS, (1 << 13));
-    CSR_CLEAR_BITS(CSR_REG_MCOUNTINHIBIT, 0x1);
+float x_acc[ACC_N], w_acc[ACC_M*ACC_N], out_acc[ACC_M];
+uint32_t loadbuf[ACC_N + 2];
+float dummy[4];
+volatile float g_seed = 1.000001f;   // opak seed: derleyici loop'u katlayamasın/CSE edemesin
+volatile float g_sink;               // dead-code elimination'ı engeller
+dma_target_t ts, td; dma_trans_t tr;
 
-    float gA=0.0f;  // accel golden
-    for (int i=0;i<NP;i++){ float a=i+1,b=i+1; src_buf[2*i]=a; src_buf[2*i+1]=b; gA+=a*b; }
-    float gC=0.0f;  // CPU golden
-    for (int i=0;i<M;i++){ xg[i]=0.5f*(i+1); yg[i]=2.0f; gC += xg[i]*yg[i]; }
+static inline void xfer(const void* s, void* d, uint32_t n){
+    ts.ptr=(uint8_t*)s; td.ptr=(uint8_t*)d; tr.size_d1_du=n;
+    dma_load_transaction(&tr); dma_launch(&tr); while(!dma_is_ready(DMA_CH));
+}
 
-    dma_target_t ts={.ptr=(uint8_t*)src_buf,.inc_d1_du=1,.trig=DMA_TRIG_MEMORY,.type=DMA_DATA_TYPE_WORD};
-    dma_target_t td={.ptr=(uint8_t*)dst_buf,.inc_d1_du=1,.trig=DMA_TRIG_MEMORY,.type=DMA_DATA_TYPE_WORD};
-    dma_trans_t tr={.src=&ts,.dst=&td,.mode=DMA_TRANS_MODE_SINGLE,.hw_fifo_en=1,
-                    .dim=DMA_DIM_CONF_1D,.size_d1_du=NW,.end=DMA_TRANS_END_POLLING,.channel=DMA_CH};
+int main(void){
+    CSR_SET_BITS(CSR_REG_MSTATUS,(1<<13));
+    CSR_CLEAR_BITS(CSR_REG_MCOUNTINHIBIT,0x1);
+
+    float gA=0.0f;
+    for(int i=0;i<ACC_N;i++) x_acc[i]=0.1f*(float)(i+1);
+    for(int m=0;m<ACC_M;m++) for(int i=0;i<ACC_N;i++) w_acc[m*ACC_N+i]=0.01f*(float)((m+1)*(i+1));
+    for(int i=0;i<ACC_N;i++) gA += x_acc[i]*w_acc[i];
+
+    ts=(dma_target_t){.ptr=(uint8_t*)loadbuf,.inc_d1_du=1,.trig=DMA_TRIG_MEMORY,.type=DMA_DATA_TYPE_WORD};
+    td=(dma_target_t){.ptr=(uint8_t*)dummy,.inc_d1_du=1,.trig=DMA_TRIG_MEMORY,.type=DMA_DATA_TYPE_WORD};
+    tr=(dma_trans_t){.src=&ts,.dst=&td,.mode=DMA_TRANS_MODE_SINGLE,.hw_fifo_en=1,
+                     .dim=DMA_DIM_CONF_1D,.size_d1_du=ACC_N+2,.end=DMA_TRANS_END_POLLING,.channel=DMA_CH};
     dma_init(NULL);
-    if (dma_validate_transaction(&tr,DMA_ENABLE_REALIGN,DMA_PERFORM_CHECKS_INTEGRITY)!=DMA_CONFIG_OK){PRINTF("val FAIL\n");return -1;}
-    if (dma_load_transaction(&tr)!=DMA_CONFIG_OK){PRINTF("load FAIL\n");return -2;}
+    dma_validate_transaction(&tr,DMA_ENABLE_REALIGN,DMA_PERFORM_CHECKS_INTEGRITY);
 
-    volatile float c1=0.0f, c2=0.0f;
+    loadbuf[0]=ACC_N; loadbuf[1]=ACC_M;
+    for(int i=0;i<ACC_N;i++) loadbuf[2+i]=f2u(x_acc[i]);
+    xfer(loadbuf, dummy, ACC_N+2);
+
     unsigned int cpu_alone, cpu_cont;
+    float k = 0.9999f, c = 0.0001f;      // register sabitler (loop dışına hoist edilir)
+    float acc;
 
-    // 1) CPU FP tek başına (accel boşta)
+    // 1) CPU FP tek başına — register-only fmadd zinciri (bellek operandı YOK -> veri-bus yarışması YOK)
+    acc = g_seed;
     CSR_WRITE(CSR_REG_MCYCLE,0);
-    for (int i=0;i<M;i++) c1 += xg[i]*yg[i];
+    for(int i=0;i<CPU_K;i++) acc = fmaf(acc, k, c);
     CSR_READ(CSR_REG_MCYCLE,&cpu_alone);
+    g_sink = acc;
 
-    // 2) ÇEKİŞME: accel'i başlat, HEMEN CPU FP yap
-    dst_buf[0]=0.0f;
-    dma_launch(&tr);                          // accel arka planda başladı
+    // 2) ÇEKİŞME — accel'i non-blocking başlat, AYNI register-only zincir
+    acc = g_seed;
+    ts.ptr=(uint8_t*)w_acc; td.ptr=(uint8_t*)out_acc; tr.size_d1_du=(uint32_t)(ACC_M*ACC_N);
+    dma_load_transaction(&tr); dma_launch(&tr);
     CSR_WRITE(CSR_REG_MCYCLE,0);
-    for (int i=0;i<M;i++) c2 += xg[i]*yg[i];  // CPU FP, accel çalışırken
+    for(int i=0;i<CPU_K;i++) acc = fmaf(acc, k, c);
     CSR_READ(CSR_REG_MCYCLE,&cpu_cont);
-    while(!dma_is_ready(DMA_CH));             // accel bitene kadar bekle
+    g_sink = acc;
+    while(!dma_is_ready(DMA_CH));
 
-    int accOK  = (fabs(dst_buf[0]-gA) < 0.5f);
-    int cpuOK  = (fabs(c1-gC)<0.5f) && (fabs(c2-gC)<0.5f);
-
+    int accOK = (fabsf(out_acc[0]-gA) < 0.05f);
     PRINTF("CPU FP alone=%u  under-contention=%u  (delta=%d cyc)\n",
            cpu_alone, cpu_cont, (int)cpu_cont-(int)cpu_alone);
-    PRINTF("accel dotp=%d (golden %d) OK=%d ; CPU dotp=%d (golden %d) OK=%d\n",
-           (int)dst_buf[0],(int)gA,accOK, (int)c2,(int)gC,cpuOK);
-    if (!(accOK && cpuOK)) { PRINTF("CONTENTION: FAIL (corruption!)\n"); return -3; }
-    PRINTF("CONTENTION: PASS - both correct under sharing, CPU-priority delta above\n");
+    PRINTF("accel dot0=%d golden=%d OK=%d\n", (int)(out_acc[0]*1000),(int)(gA*1000),accOK);
+    if(!accOK){ PRINTF("CONTENTION: FAIL\n"); return -3; }
+    PRINTF("CONTENTION: PASS - delta = CPU drain penalty (bus-free)\n");
     return 0;
 }

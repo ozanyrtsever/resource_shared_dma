@@ -1,8 +1,16 @@
-// dma_apu_arbiter.sv — CPU-priority shared-FPU APU arbiter (thesis contribution).
-// Muxes the CPU's and the DMA coprocessor's APU/FMA requests onto ONE shared FPnew
-// FMA. CPU has strict priority; the coprocessor uses the FMA only when the CPU is
-// idle, and is DRAINED (its in-flight op finishes — FPnew has no flush) before the
-// CPU is served. In-flight ops never mix owners, so responses route by owner.
+// dma_apu_arbiter.sv — CPU-priority FULLY-PIPELINED shared-FPU APU arbiter (thesis contribution v2).
+//
+// The CPU's and the DMA coprocessor's FMA ops may be IN FLIGHT SIMULTANEOUSLY in the shared FPnew
+// pipeline (NO draining). The CPU has strict priority for the single 1-op/cycle issue slot; the
+// coprocessor uses any slot the CPU does not.
+//
+// Each issued op is tagged with its owner (fpu_tag_o: 1=DMA coprocessor, 0=CPU). FPnew carries that
+// tag through whichever lane the op uses and returns it WITH the result (fpu_tag_i). The response is
+// routed by that returned tag, so it is correct EVEN IF FPnew's lanes retire out of order — e.g. a
+// CPU fdiv/fsqrt (slow DIVSQRT lane) concurrent with the coprocessor's fmadd (fast ADDMUL lane).
+//
+// Requires: cv32e40px_fp_wrapper to expose fpnew's tag (apu_tag_i/apu_tag_o), and the top-level to
+// wire arbiter.fpu_tag_o -> wrapper.apu_tag_i and wrapper.apu_tag_o -> arbiter.fpu_tag_i.
 module dma_apu_arbiter
   import cv32e40px_apu_core_pkg::*;
 (
@@ -36,52 +44,43 @@ module dma_apu_arbiter
     output logic [APU_NARGS_CPU-1:0][31:0] fpu_operands_o,
     output logic [APU_WOP_CPU-1:0]         fpu_op_o,
     output logic [APU_NDSFLAGS_CPU-1:0]    fpu_flags_o,
+    output logic                           fpu_tag_o,      // owner tag of the op issued this cycle
     input  logic                           fpu_rvalid_i,
     input  logic [31:0]                    fpu_rdata_i,
-    input  logic [APU_NUSFLAGS_CPU-1:0]    fpu_rflags_i
+    input  logic [APU_NUSFLAGS_CPU-1:0]    fpu_rflags_i,
+    input  logic                           fpu_tag_i       // owner tag returned WITH the result
 );
 
-  logic [2:0] inflight_q;                 // ops issued into the FMA but not yet returned
-  logic       owner_q;                    // 0 = CPU, 1 = DMA (owner of in-flight ops)
-  wire        pipe_empty = (inflight_q == '0);
+  logic [2:0] inflight_q;                     // ops in the pipeline (for the FMA clock-gate only)
 
-  // Who may ISSUE a new op this cycle. Never mix owners: while the pipe is non-empty
-  // only the current owner may issue more. When empty, CPU has priority.
-  wire can_cpu = cpu_req_i & (pipe_empty | ~owner_q);
-  wire can_dma = dma_req_i & ~cpu_req_i & (pipe_empty | owner_q);
-  wire issue_cpu = can_cpu;               // CPU priority
-  wire issue_dma = can_dma & ~can_cpu;
+  // ---- Issue: CPU strict priority for the single 1-op/cycle slot; BOTH may be in flight ----
+  wire issue_cpu = cpu_req_i;
+  wire issue_dma = dma_req_i & ~cpu_req_i;
 
-  // Request routing to the FMA
   assign fpu_req_o      = issue_cpu | issue_dma;
   assign fpu_operands_o = issue_dma ? dma_operands_i : cpu_operands_i;
   assign fpu_op_o       = issue_dma ? dma_op_i       : cpu_op_i;
   assign fpu_flags_o    = issue_dma ? dma_flags_i    : cpu_flags_i;
+  assign fpu_tag_o      = issue_dma;          // tag the issued op with its owner (1 = DMA, 0 = CPU)
   assign fma_active_o   = dma_req_i | (inflight_q != '0);
 
-  // Grant back to the selected requester only
   assign cpu_gnt_o = issue_cpu & fpu_gnt_i;
   assign dma_gnt_o = issue_dma & fpu_gnt_i;
 
-  // Response routing: all in-flight ops belong to owner_q, so route by owner.
-    // Aynı-çevrim (latency-0) issue+complete: owner_q henüz güncellenmedi -> issue_dma kullan
-  wire resp_owner = (pipe_empty & fpu_req_o & fpu_gnt_i) ? issue_dma : owner_q;
+  // ---- Response: route by the tag returned with the result (out-of-order safe) ----
+  wire resp_owner = fpu_tag_i;
   assign cpu_rvalid_o = fpu_rvalid_i & ~resp_owner;
   assign dma_rvalid_o = fpu_rvalid_i &  resp_owner;
-  assign cpu_rdata_o  = fpu_rdata_i;      // consumer only latches on its own rvalid
+  assign cpu_rdata_o  = fpu_rdata_i;          // consumer latches only on its own rvalid
   assign dma_rdata_o  = fpu_rdata_i;
   assign cpu_rflags_o = fpu_rflags_i;
   assign dma_rflags_o = fpu_rflags_i;
 
-  wire issue = fpu_req_o & fpu_gnt_i;     // op accepted into the FMA
+  // ---- In-flight counter (drives fma_active_o for the FMA clock-gate) ----
+  wire issue = fpu_req_o & fpu_gnt_i;
   always_ff @(posedge clk_i or negedge rst_ni) begin
-    if (!rst_ni) begin
-      inflight_q <= '0;
-      owner_q    <= 1'b0;
-    end else begin
-      inflight_q <= inflight_q + 3'(issue) - 3'(fpu_rvalid_i);
-      if (pipe_empty && issue) owner_q <= issue_dma;   // latch owner on entering the pipe
-    end
+    if (!rst_ni) inflight_q <= '0;
+    else         inflight_q <= inflight_q + 3'(issue) - 3'(fpu_rvalid_i);
   end
 
 endmodule

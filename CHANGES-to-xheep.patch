@@ -1145,8 +1145,42 @@ index bfff7c9..3823b5a 100644
  lint_off -rule COMBDLY -file "*/bhv/cv32e40px_sim_clock_gate.sv" -match "Non-blocking assignment '<=' in combinational logic process"
 +lint_off -rule WIDTHEXPAND -file "*/rtl/cv32e40px_decoder.sv"
 +lint_off -rule WIDTHTRUNC  -file "*/rtl/cv32e40px_decoder.sv"
+diff --git a/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_fp_wrapper.sv b/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_fp_wrapper.sv
+index 126a1f4..1fe9b0f 100644
+--- a/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_fp_wrapper.sv
++++ b/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_fp_wrapper.sv
+@@ -33,7 +33,11 @@ module cv32e40px_fp_wrapper
+     // response channel
+     output logic                        apu_rvalid_o,
+     output logic [                31:0] apu_rdata_o,
+-    output logic [APU_NUSFLAGS_CPU-1:0] apu_rflags_o
++    output logic [APU_NUSFLAGS_CPU-1:0] apu_rflags_o,
++
++    // TAG
++    input logic apu_tag_i,
++    output logic apu_tag_o
+ );
+ 
+ 
+@@ -110,14 +114,14 @@ module cv32e40px_fp_wrapper
+       .dst_fmt_i     (fpnew_pkg::fp_format_e'(fpu_dst_fmt)),
+       .int_fmt_i     (fpnew_pkg::int_format_e'(fpu_int_fmt)),
+       .vectorial_op_i(fpu_vec_op),
+-      .tag_i         (1'b0),
++      .tag_i         (apu_tag_i),
+       .simd_mask_i   (1'b0),
+       .in_valid_i    (apu_req_i),
+       .in_ready_o    (apu_gnt_o),
+       .flush_i       (1'b0),
+       .result_o      (apu_rdata_o),
+       .status_o      (apu_rflags_o),
+-      .tag_o         (  /* unused */),
++      .tag_o         (apu_tag_o),
+       .out_valid_o   (apu_rvalid_o),
+       .out_ready_i   (1'b1),
+       .busy_o        (  /* unused */)
 diff --git a/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_top.sv b/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_top.sv
-index 03b9962..fff5d9f 100644
+index 03b9962..384969f 100644
 --- a/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_top.sv
 +++ b/hw/vendor/xheep/cv32e40px/rtl/cv32e40px_top.sv
 @@ -112,6 +112,18 @@ module cv32e40px_top
@@ -1168,7 +1202,7 @@ index 03b9962..fff5d9f 100644
  );
  
    import cv32e40px_apu_core_pkg::*;
-@@ -226,8 +238,94 @@ module cv32e40px_top
+@@ -226,8 +238,101 @@ module cv32e40px_top
  
    generate
      if (FPU) begin : fpu_gen
@@ -1182,6 +1216,8 @@ index 03b9962..fff5d9f 100644
 +      logic                             w_apu_rvalid;
 +      logic [                31:0]       w_apu_rdata;
 +      logic [APU_NUSFLAGS_CPU-1:0]       w_apu_rflags;
++      logic                              w_apu_tag;
++      logic                              w_apu_rtag;
 +
 +`ifdef COPROC_FPU_SHARE
 +      // ---- Shared-FPU CPU-priority arbiter (tez katkısı) ----
@@ -1213,10 +1249,12 @@ index 03b9962..fff5d9f 100644
 +          .fpu_gnt_i     (w_apu_gnt),
 +          .fpu_operands_o(w_apu_operands),
 +          .fpu_op_o      (w_apu_op),
++          .fpu_tag_o     (w_apu_tag),
 +          .fpu_flags_o   (w_apu_flags),
 +          .fpu_rvalid_i  (w_apu_rvalid),
 +          .fpu_rdata_i   (w_apu_rdata),
 +          .fpu_rflags_i  (w_apu_rflags),
++          .fpu_tag_i     (w_apu_rtag),
 +          .fma_active_o  (fma_active)
 +      );
 +      assign apu_clk_en = apu_req | apu_busy | fma_active;
@@ -1230,6 +1268,7 @@ index 03b9962..fff5d9f 100644
 +      assign apu_rvalid     = w_apu_rvalid;
 +      assign apu_rdata      = w_apu_rdata;
 +      assign apu_rflags     = w_apu_rflags;
++      assign w_apu_tag      = 1'b0; // unused
 +      assign apu_clk_en     = apu_req | apu_busy;
 +`endif
 +
@@ -1255,7 +1294,9 @@ index 03b9962..fff5d9f 100644
 +          .apu_flags_i   (w_apu_flags),
 +          .apu_rvalid_o  (w_apu_rvalid),
 +          .apu_rdata_o   (w_apu_rdata),
-+          .apu_rflags_o  (w_apu_rflags)
++          .apu_rflags_o  (w_apu_rflags),
++          .apu_tag_i     (w_apu_tag),
++          .apu_tag_o     (w_apu_rtag)
 +      );
  
 -      assign apu_clk_en = apu_req | apu_busy;
@@ -1264,7 +1305,7 @@ index 03b9962..fff5d9f 100644
  
        // FPU clock gate
        cv32e40px_clock_gate core_clock_gate_i (
-@@ -252,7 +350,7 @@ module cv32e40px_top
+@@ -252,7 +357,7 @@ module cv32e40px_top
            .apu_rvalid_o  (apu_rvalid),
            .apu_rdata_o   (apu_rdata),
            .apu_rflags_o  (apu_rflags)
