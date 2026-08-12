@@ -855,23 +855,76 @@ the CPU's own job while it streams, synchronize) so the two truly overlap:
 | Co-execution | Foreground (CPU) | Background (accel) | CPU slow-down | Both correct? | 2 jobs, concurrent vs sequential |
 |---|---|---|---:|---|---|
 | **Dual inference** | LeNet on digit A | LeNet on digit B | +6.8 % | bit-exact ✓ | 2 868 098 vs 3 220 764 → **1.12×** |
-| **ML ∥ DSP** | 256-tap FIR filter | LeNet inference | +7.9 % | bit-exact ✓ | 2 297 296 vs 2 663 763 → **1.15×** |
+| **ML ∥ DSP** | 256-tap FIR filter | LeNet inference | +3.9 % | bit-exact ✓ | 2 208 719 vs 2 659 133 → **1.20×** |
 
 Three findings hold across both. **(1) Correctness under contention:** every result — the CPU's job and
 the coprocessor's — is *bit-identical* to the same computation run alone, so time-sharing the FMA on
 concurrent live traffic corrupts nothing; the arbiter's stall/drain/resume is transparent. **(2) The
-CPU is not starved:** its floating-point job runs only 6.8–7.9 % slower with the coprocessor active
+CPU is not starved:** its floating-point job runs only 3.9–6.8 % slower with the coprocessor active
 concurrently, and that residual is memory-*bus* arbitration (both masters fetch operands from the same
 SRAM), not FMA starvation — the CPU-priority guarantee holds on live, workload-generated contention,
 consistent with the isolated Phase-Y3 measurement. **(3) The inference rides in the CPU's idle FMA
 cycles:** because a CPU floating-point loop leaves the FMA idle most cycles (operand loads, indexing,
 loop overhead between issues), the coprocessor slots the model's dot products into those gaps —
-delivering roughly two-thirds of the inference "for free" and completing two concurrent jobs in
-**1.12–1.15×** the time of one, from a **single** FMA. The throughput gain is modest here only because
+delivering the bulk of the inference "for free" and completing two concurrent jobs in
+**1.12–1.20×** the time of one, from a **single** FMA. The throughput gain is modest here only because
 both workloads are themselves memory-active, so the shared operand bus — not the shared FMA — becomes
 the limiter; the correctness and CPU-priority guarantees, which are the point, are unconditional. This
 is the arbiter's *raison d'être* demonstrated on a real workload: a foreground floating-point task and
 a neural network share one FMA, concurrently and bit-exactly, with **no second floating-point unit**.
+
+### The accelerator's cycle budget: where every cycle goes
+
+The speed-up figures say *how much* faster the coprocessor is; they do not say *where* its time goes,
+and a fair engineering account must leave nothing out. To decompose one inference into disjoint,
+exhaustive phases, the host code brackets each phase of the accelerated forward pass with the cycle
+counter (`mcycle`): the DMA descriptor programming (**setup**), the transfer that streams the input
+vector into the coprocessor's buffer (**load**), the transfer that streams the weight matrix and drains
+the dot products (**gemv**), and the CPU-side activation between layers (**act** — bias add and ReLU).
+By construction these four sum to the measured accelerator forward pass, so no cycle is left
+unattributed. The weight matrix is now sent as a **single two-dimensional DMA transfer** per layer
+(`size_d1 = N` inner, `size_d2 = M` outer, unit stride) rather than the earlier row-chunked
+one-dimensional transfers; this fills the input buffer once per layer instead of once per chunk, and —
+because both 2-D size fields are 16-bit — a whole 235 200-element layer travels in one descriptor,
+re-verified bit-exact against both the chunked path and the CPU reference.
+
+For LeNet-300-100 on one MNIST digit, with a combinational FMA (`FPU_ADDMUL_LAT = 0`):
+
+| Phase | Cycles | Share | What it is |
+|---|---:|---:|---|
+| setup (DMA program) | 2 688 | 0.5 % | descriptor validation + register programming, both transfers, all layers |
+| load (x stream) | 1 833 | 0.3 % | input vector streamed into the coprocessor's buffer, once per layer |
+| **gemv (stream + FMA + writeback)** | **533 267** | **96.6 %** | weights streamed, dot products computed and drained |
+| act (bias + ReLU) | 14 440 | 2.6 % | CPU-side activation between layers |
+| **total (accelerator forward)** | **552 228** | 100 % | CPU fused baseline 2 654 927 → **4.80×**, no 2nd FPU |
+
+Two things stand out. First, the coprocessor is overwhelmingly **compute-bound**: 96.6 % of the time is
+the weight-streaming dot-product phase, while the software overhead of driving the DMA (setup) and
+loading the input (load) together cost under 1 % — the shared-FMA datapath, not the programming model,
+sets the pace, which is exactly what an offload engine should do. Second, the `gemv` phase costs
+**533 267 / 266 200 = 2.00 cycles per fused multiply-add** across the network's 266 200 MACs. That
+number is the accelerator's steady-state throughput laid bare: at zero FMA latency the control FSM
+spends one cycle accepting each weight and one cycle issuing the FMA and latching its result, with no
+wait state — the floor for a single-issue, single-FMA design. The `gemv` figure necessarily fuses
+operand fetch, FMA execution and result writeback, which overlap in the streaming pipeline and are not
+separable in software; the components that *do* separate cleanly — the per-transfer programming
+overhead here, and the memory-contention and FMA-latency adders isolated in the concurrency and latency
+studies — are each reported on their own line. This table is the `FPU_ADDMUL_LAT = 0` row; sweeping the
+FMA latency adds a wait-state term to `gemv` (the 2.00 cyc/MAC floor rises), and running the same
+forward pass under CPU contention adds the memory-bus term measured in the co-execution study, so the
+budget stays closed from end to end at every operating point.
+
+That contention term is now measured on the very same `L = 0` forward pass. Running LeNet on the
+coprocessor while the CPU runs its FIR filter — both streaming into the one FMA — stretches the `gemv`
+phase from 533 287 to 609 462 cycles, a **+14.3 % (76 175-cycle) memory-and-drain term**; because a
+combinational FMA has essentially no drain at `FPU_ADDMUL_LAT = 0` (the isolated drain study measures
+≈ 2 cycles there), this term is almost entirely operand-**bus** contention between the DMA and the CPU
+on the shared SRAM. The CPU's own FIR slows by a comparable **+3.9 %** (81 207 cycles) — again bus, not
+FMA starvation, so the CPU-priority guarantee holds on live traffic — and the two jobs finish in
+**1.20×** the time of running them sequentially (2 208 719 vs 2 659 133 cycles), the inference riding in
+the FIR's idle FMA cycles. Both results remain bit-exact under the contention. The memory-and-drain
+term will grow with FMA latency, where the drain component stops being negligible — the subject of the
+latency sweep.
 
 ---
 

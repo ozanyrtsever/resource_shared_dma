@@ -27,8 +27,9 @@ core is published; `CHANGES-to-xheep.patch` is the exact diff applied to the ven
 | **Area:** avoided FMA (`fp_wrapper`) vs added arbiter | **12 812 µm² vs 321 µm²** (arbiter = **2.5 %** of one FMA) |
 | Dense layer (GEMV) | **2.6×** |
 | Convolution (StarDist conv1, im2col→GEMV) | bit-exact, **1.97×** |
-| **Full network: LeNet-300-100 on MNIST** | bit-exact vs CPU & NumPy, **4.79×** (556 318 vs 2 664 446 cyc), model ~98 % |
-| **Co-execution (ML ∥ CPU FIR-DSP), shared FMA** | both bit-exact; CPU +7.9 % (bus, not FMA-starvation); inference hidden in idle FMA cycles → **1.15×** |
+| **Full network: LeNet-300-100 on MNIST** | bit-exact vs CPU & NumPy, **4.80×** (552 228 vs 2 654 927 cyc, whole matrix in one 2D transfer), model ~98 % |
+| **Co-execution (ML ∥ CPU FIR-DSP), shared FMA** | both bit-exact; under contention accel GEMV +14.3 % / CPU +3.9 % (bus, not FMA-starvation); inference hidden in idle FMA cycles → **1.20×** |
+| **Cycle-budget decomposition (L=0)** | of the 552 228-cyc accel forward: **gemv 96.6 %** (= 2.00 cyc/MAC) · load 0.3 % · setup 0.5 % · act 2.6 % — compute-bound, offload overhead <1 % |
 
 ## Repository map
 ```
@@ -50,10 +51,11 @@ x-heep/
   util/xheep_gen/load_config.py fpu_addmul_lat forwarding fix (FMA-latency sweep)
   dc/                           Design Compiler area flow + the synthesis reports behind the area table
   sw/applications/
-    ml_lenet/       full LeNet-300-100 forward pass on the coprocessor (4.79×)
-    ml_coexec/      *** co-execution: accel ML || CPU FIR filter, sharing one FMA ***
+    ml_lenet/       full LeNet-300-100 forward (2D single-transfer) + cycle-budget decomposition (4.80×)
+    ml_coexec/      *** co-execution: accel ML || CPU FIR, 2D + accel/CPU contention decomposition ***
     ml_dual/        dual-stream: CPU classifies one digit while accel classifies another
     ml_rt_gemv/     runtime-N/M bring-up
+    ml_rt_gemv_2d/  2D single-transfer GEMV validation (whole M×N > 65535 in ONE 2D DMA transfer)
     ml_conv1[_full]/ convolution via im2col→GEMV
     y2_fpdotp_test/ Y2: first on-SoC shared-FMA dot product
     y3_{sweep,contention,independent}/  Y3 measurement kernels (length, concurrency, contention)
