@@ -36,8 +36,8 @@ module cv32e40px_fp_wrapper
     output logic [APU_NUSFLAGS_CPU-1:0] apu_rflags_o,
 
     // TAG
-    input logic apu_tag_i,
-    output logic apu_tag_o
+    input logic [1:0] apu_tag_i,
+    output logic [1:0] apu_tag_o
 );
 
 
@@ -102,7 +102,7 @@ module cv32e40px_fp_wrapper
       .Features      (FPU_FEATURES),
       .Implementation(FPU_IMPLEMENTATION),
       .PulpDivsqrt   (1'b0),
-      .TagType       (logic)
+      .TagType       (logic [1:0])
   ) i_fpnew_bulk (
       .clk_i         (clk_i),
       .rst_ni        (rst_ni),

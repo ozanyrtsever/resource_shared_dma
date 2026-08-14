@@ -926,6 +926,57 @@ the FIR's idle FMA cycles. Both results remain bit-exact under the contention. T
 term will grow with FMA latency, where the drain component stops being negligible — the subject of the
 latency sweep.
 
+### Scaling the sharing: two coprocessors on one FMA, and a parametric arbiter
+
+The cycle budget above exposes an opening: with a combinational FMA the single coprocessor spends
+2.00 cycles per multiply–add — one to accept a weight, one to issue the fused op — so the shared FMA's
+issue slot sits **idle every other cycle**. If one coprocessor leaves the unit half-idle, a *second*
+one can fill those slots, lifting throughput **still without a second FMA**.
+
+A second identical GEMV coprocessor (acc1) is attached to a second DMA channel — channel 2, which the
+X-HEEP DMA routes through a *different* bus master port, so the two weight streams fetch operands in
+parallel rather than serialising. The CPU-priority arbiter generalises from two requestors to three
+(CPU, acc0, acc1): the owner tag widens from one bit to two (0 = CPU, 1 = acc0, 2 = acc1) and, exactly
+as before, rides through FPnew and returns with the result, so responses route to the right owner even
+when the shared unit's lanes retire out of order. A dense layer is divided by **output rows** (an
+M-split): acc0 computes the first ⌈M/2⌉ rows, acc1 the rest, each an independent dot product of the
+same input vector. Because the split never crosses a dot product, every row's accumulation order is
+identical to the single-coprocessor and CPU orders — bit-exactness is structural, not incidental; the
+only thing the two share is the FMA, which the arbiter still serialises to one issue per cycle.
+
+The grant decision itself is made **swappable**. It is an elaboration-time policy parameter, so only
+the selected policy's logic synthesises (keeping the per-policy area honest), and three are provided:
+**(0)** CPU strict priority with the two coprocessors round-robining the slots the CPU leaves — the
+default, which preserves the CPU-priority guarantee; **(1)** a full round-robin over all three peers,
+which *removes* CPU priority so its cost can be measured directly; and **(2)** a weighted (QoS)
+round-robin whose per-requestor weights are programmable. The shared datapath — operand mux, tag
+generation, tag-routed response — is identical for every policy; adding one is a ~15-line block.
+
+A compact benchmark exercises the whole design end to end on a tiny three-layer MLP (128→64→32→16,
+10 752 MACs) so it runs in seconds while measuring every quantity of interest; all results are
+bit-exact against the CPU (policy 0, combinational FMA):
+
+| Scenario | GEMV cycles | cyc/MAC | Result |
+|---|---:|---:|---|
+| One coprocessor (acc0) | 22 042 | 2.05 | **3.22×** vs CPU (27 341 vs 88 174), bit-exact |
+| acc0 ∥ CPU FIR | 24 657 | — | +11 % accelerator slow-down (bus); **CPU FIR +0 %** |
+| **Two coprocessors (acc0 + acc1)** | **14 837** | **1.37** | **GEMV 1.48×**, bit-exact, channel imbalance 188 cyc (≈1 %) |
+| Two coprocessors ∥ CPU FIR | 23 913 | — | +61 % accelerator slow-down; **CPU FIR +11 %** (bus) |
+
+Three points. **The second coprocessor pays off:** it lifts GEMV throughput 1.48× (2.05 → 1.37
+cyc/MAC), pushing FMA-issue utilisation from ~50 % toward ~75 %, and the two channels finish within
+~1 % of each other, so the row-split is well balanced. The shortfall from an ideal 2× is operand-bus
+and arbitration overhead between the two streams — not the FMA — and no floating-point datapath was
+added to obtain it. **Bit-exactness survives every configuration**, including two coprocessors and the
+CPU all issuing into the one unit concurrently, confirming the two-bit tag routing is correct under
+genuine three-way, out-of-order traffic. **CPU priority still holds where it must:** a concurrent CPU
+FIR filter slows 0 % against one coprocessor and 11 % against two — and that 11 % is operand-bus
+contention from two DMA streams, never FMA starvation — while the coprocessors absorb the whole cost of
+sharing (+11 % and +61 %). That asymmetry is the design intent made measurable: the CPU's own
+floating-point work is protected by construction, and the coprocessors are best-effort. Comparing the
+three policies (0/1/2) on this same benchmark — the CPU-priority guarantee traded against peer-fairness
+and against a programmable QoS knob — is the immediate next measurement.
+
 ---
 
 ## Appendix A — Reproducibility (current, X-HEEP)

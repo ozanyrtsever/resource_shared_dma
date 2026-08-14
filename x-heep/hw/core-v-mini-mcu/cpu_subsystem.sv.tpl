@@ -56,6 +56,15 @@ module cpu_subsystem
         ,output logic             apu_ext_rvalid_o
         ,output logic [31:0]      apu_ext_rdata_o
         ,output logic [4:0]       apu_ext_rflags_o
+        ,input  logic             apu_ext1_req_i
+        ,output logic             apu_ext1_gnt_o
+        ,input  logic [2:0][31:0] apu_ext1_operands_i
+        ,input  logic [5:0]       apu_ext1_op_i
+        ,input  logic [14:0]      apu_ext1_flags_i
+        ,output logic             apu_ext1_rvalid_o
+        ,output logic [31:0]      apu_ext1_rdata_o
+        ,output logic [4:0]       apu_ext1_rflags_o
+
     `endif
 );
 
@@ -329,7 +338,7 @@ ${",\n".join(cv32e40px_params)}
 
         .fetch_enable_i(fetch_enable),
         .core_sleep_o
-                `ifdef COPROC_FPU_SHARE
+        `ifdef COPROC_FPU_SHARE
             ,.apu_ext_req_i
             ,.apu_ext_gnt_o
             ,.apu_ext_operands_i
@@ -338,6 +347,14 @@ ${",\n".join(cv32e40px_params)}
             ,.apu_ext_rvalid_o
             ,.apu_ext_rdata_o
             ,.apu_ext_rflags_o
+            ,.apu_ext1_req_i
+            ,.apu_ext1_gnt_o
+            ,.apu_ext1_operands_i
+            ,.apu_ext1_op_i
+            ,.apu_ext1_flags_i
+            ,.apu_ext1_rvalid_o
+            ,.apu_ext1_rdata_o
+            ,.apu_ext1_rflags_o
         `endif
 
 

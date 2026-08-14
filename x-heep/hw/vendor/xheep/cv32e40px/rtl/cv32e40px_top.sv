@@ -122,6 +122,15 @@ module cv32e40px_top
         ,output logic             apu_ext_rvalid_o
         ,output logic [31:0]      apu_ext_rdata_o
         ,output logic [4:0]       apu_ext_rflags_o     // APU_NUSFLAGS_CPU = 5
+        ,input  logic             apu_ext1_req_i
+        ,output logic             apu_ext1_gnt_o
+        ,input  logic [2:0][31:0] apu_ext1_operands_i
+        ,input  logic [5:0]       apu_ext1_op_i
+        ,input  logic [14:0]      apu_ext1_flags_i
+        ,output logic             apu_ext1_rvalid_o
+        ,output logic [31:0]      apu_ext1_rdata_o
+        ,output logic [4:0]       apu_ext1_rflags_o
+
     `endif
 
 );
@@ -248,13 +257,30 @@ module cv32e40px_top
       logic                             w_apu_rvalid;
       logic [                31:0]       w_apu_rdata;
       logic [APU_NUSFLAGS_CPU-1:0]       w_apu_rflags;
-      logic                              w_apu_tag;
-      logic                              w_apu_rtag;
+      logic [1:0]                        w_apu_tag;
+      logic [1:0]                        w_apu_rtag;
 
 `ifdef COPROC_FPU_SHARE
       // ---- Shared-FPU CPU-priority arbiter (tez katkısı) ----
+
       logic fma_active;
-      dma_apu_arbiter arb_i (
+
+      `ifndef ARB_POLICY_SEL
+            `define ARB_POLICY_SEL 1
+      `endif
+      `ifndef ARB_W_CPU
+            `define ARB_W_CPU 4
+      `endif
+      `ifndef ARB_W_ACC0
+            `define ARB_W_ACC0 1
+      `endif
+      `ifndef ARB_W_ACC1
+            `define ARB_W_ACC1 1
+      `endif
+      dma_apu_arbiter #(
+          .ARB_POLICY(`ARB_POLICY_SEL),
+          .W_CPU (`ARB_W_CPU), .W_ACC0(`ARB_W_ACC0), .W_ACC1(`ARB_W_ACC1)
+      ) arb_i (
           .clk_i (clk_i),
           .rst_ni(rst_ni),
           // CPU tarafı (core'dan)
@@ -275,6 +301,15 @@ module cv32e40px_top
           .dma_rvalid_o  (apu_ext_rvalid_o),
           .dma_rdata_o   (apu_ext_rdata_o),
           .dma_rflags_o  (apu_ext_rflags_o),
+          .dma1_req_i     (apu_ext1_req_i),
+          .dma1_gnt_o     (apu_ext1_gnt_o),
+          .dma1_operands_i(apu_ext1_operands_i),
+          .dma1_op_i      (apu_ext1_op_i),
+          .dma1_flags_i   (apu_ext1_flags_i),
+          .dma1_rvalid_o  (apu_ext1_rvalid_o),
+          .dma1_rdata_o   (apu_ext1_rdata_o),
+          .dma1_rflags_o  (apu_ext1_rflags_o),
+
 
           // FPU (FMA wrapper) tarafı
           .fpu_req_o     (w_apu_req),
@@ -300,7 +335,7 @@ module cv32e40px_top
       assign apu_rvalid     = w_apu_rvalid;
       assign apu_rdata      = w_apu_rdata;
       assign apu_rflags     = w_apu_rflags;
-      assign w_apu_tag      = 1'b0; // unused
+      assign w_apu_tag      = 2'b0; // unused
       assign apu_clk_en     = apu_req | apu_busy;
 `endif
 

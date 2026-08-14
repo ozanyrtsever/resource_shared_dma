@@ -1,24 +1,20 @@
-// dma_apu_arbiter.sv — CPU-priority FULLY-PIPELINED shared-FPU APU arbiter (thesis contribution v2).
-//
-// The CPU's and the DMA coprocessor's FMA ops may be IN FLIGHT SIMULTANEOUSLY in the shared FPnew
-// pipeline (NO draining). The CPU has strict priority for the single 1-op/cycle issue slot; the
-// coprocessor uses any slot the CPU does not.
-//
-// Each issued op is tagged with its owner (fpu_tag_o: 1=DMA coprocessor, 0=CPU). FPnew carries that
-// tag through whichever lane the op uses and returns it WITH the result (fpu_tag_i). The response is
-// routed by that returned tag, so it is correct EVEN IF FPnew's lanes retire out of order — e.g. a
-// CPU fdiv/fsqrt (slow DIVSQRT lane) concurrent with the coprocessor's fmadd (fast ADDMUL lane).
-//
-// Requires: cv32e40px_fp_wrapper to expose fpnew's tag (apu_tag_i/apu_tag_o), and the top-level to
-// wire arbiter.fpu_tag_o -> wrapper.apu_tag_i and wrapper.apu_tag_o -> arbiter.fpu_tag_i.
+// dma_apu_arbiter.sv — shared-FPU APU arbiter, THREE requestors (CPU + acc0 + acc1), PARAMETRIC POLICY.
+// Only the ARB_POLICY-selected policy elaborates (generate) -> honest per-policy area, no dead logic.
+// FPnew round-trips the 2-bit owner tag (0=CPU,1=acc0,2=acc1) with each result -> out-of-order safe.
+// Invariant (all policies): bit-exactness — arbitration reorders ops BETWEEN owners only.
 module dma_apu_arbiter
   import cv32e40px_apu_core_pkg::*;
-(
+#(
+    parameter int unsigned ARB_POLICY = 0,   // 0=CPU-strict+accRR  1=all-RR  2=QoS-weighted
+    parameter int unsigned W_CPU  = 4,       // QoS weights (ARB_POLICY==2 only)
+    parameter int unsigned W_ACC0 = 1,
+    parameter int unsigned W_ACC1 = 1
+)(
     input  logic clk_i,
     input  logic rst_ni,
     output logic fma_active_o,
 
-    // ---- CPU side (from the core) ----
+    // ---- CPU side ----
     input  logic                           cpu_req_i,
     output logic                           cpu_gnt_o,
     input  logic [APU_NARGS_CPU-1:0][31:0] cpu_operands_i,
@@ -28,7 +24,7 @@ module dma_apu_arbiter
     output logic [31:0]                    cpu_rdata_o,
     output logic [APU_NUSFLAGS_CPU-1:0]    cpu_rflags_o,
 
-    // ---- DMA coprocessor side ----
+    // ---- acc0 (first DMA coprocessor, channel 1) ----
     input  logic                           dma_req_i,
     output logic                           dma_gnt_o,
     input  logic [APU_NARGS_CPU-1:0][31:0] dma_operands_i,
@@ -38,49 +34,127 @@ module dma_apu_arbiter
     output logic [31:0]                    dma_rdata_o,
     output logic [APU_NUSFLAGS_CPU-1:0]    dma_rflags_o,
 
+    // ---- acc1 (second DMA coprocessor, channel 2) ----
+    input  logic                           dma1_req_i,
+    output logic                           dma1_gnt_o,
+    input  logic [APU_NARGS_CPU-1:0][31:0] dma1_operands_i,
+    input  logic [APU_WOP_CPU-1:0]         dma1_op_i,
+    input  logic [APU_NDSFLAGS_CPU-1:0]    dma1_flags_i,
+    output logic                           dma1_rvalid_o,
+    output logic [31:0]                    dma1_rdata_o,
+    output logic [APU_NUSFLAGS_CPU-1:0]    dma1_rflags_o,
+
     // ---- FPU (FMA wrapper) side ----
     output logic                           fpu_req_o,
     input  logic                           fpu_gnt_i,
     output logic [APU_NARGS_CPU-1:0][31:0] fpu_operands_o,
     output logic [APU_WOP_CPU-1:0]         fpu_op_o,
     output logic [APU_NDSFLAGS_CPU-1:0]    fpu_flags_o,
-    output logic                           fpu_tag_o,      // owner tag of the op issued this cycle
+    output logic [1:0]                     fpu_tag_o,
     input  logic                           fpu_rvalid_i,
     input  logic [31:0]                    fpu_rdata_i,
     input  logic [APU_NUSFLAGS_CPU-1:0]    fpu_rflags_i,
-    input  logic                           fpu_tag_i       // owner tag returned WITH the result
+    input  logic [1:0]                     fpu_tag_i
 );
 
-  logic [2:0] inflight_q;                     // ops in the pipeline (for the FMA clock-gate only)
+  logic [3:0] inflight_q;
+  wire  [2:0] req = {dma1_req_i, dma_req_i, cpu_req_i};   // [0]=CPU [1]=acc0 [2]=acc1
+  logic [2:0] grant;                                       // one-hot; driven by the selected policy
 
-  // ---- Issue: CPU strict priority for the single 1-op/cycle slot; BOTH may be in flight ----
-  wire issue_cpu = cpu_req_i;
-  wire issue_dma = dma_req_i & ~cpu_req_i;
+  // ===================== policy (ONLY the selected one elaborates) =====================
+  generate
+    // -------- P0: CPU strict priority; the two accs round-robin the leftover slots --------
+    if (ARB_POLICY == 0) begin : g_policy
+      logic rr_acc_q;
+      always_comb begin
+        grant = 3'b000;
+        if (req[0])                     grant[0] = 1'b1;         // CPU always wins
+        else if (req[1] && req[2])      grant[rr_acc_q ? 2 : 1] = 1'b1;
+        else if (req[1])                grant[1] = 1'b1;
+        else if (req[2])                grant[2] = 1'b1;
+      end
+      always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni)                    rr_acc_q <= 1'b0;
+        else if (grant[1] & fpu_gnt_i)  rr_acc_q <= 1'b1;        // acc0 served -> next prefer acc1
+        else if (grant[2] & fpu_gnt_i)  rr_acc_q <= 1'b0;
+      end
+    end
+    // -------- P1: full round-robin over the three peers (rotating priority) --------
+    else if (ARB_POLICY == 1) begin : g_policy
+      logic [1:0] rr_ptr_q;
+      always_comb begin
+        grant = 3'b000;
+        unique case (rr_ptr_q)
+          2'd0:    begin if (req[0]) grant[0]=1'b1; else if (req[1]) grant[1]=1'b1; else if (req[2]) grant[2]=1'b1; end
+          2'd1:    begin if (req[1]) grant[1]=1'b1; else if (req[2]) grant[2]=1'b1; else if (req[0]) grant[0]=1'b1; end
+          default: begin if (req[2]) grant[2]=1'b1; else if (req[0]) grant[0]=1'b1; else if (req[1]) grant[1]=1'b1; end
+        endcase
+      end
+      always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni)                    rr_ptr_q <= 2'd0;
+        else if (fpu_req_o & fpu_gnt_i) begin
+          if      (grant[0])            rr_ptr_q <= 2'd1;
+          else if (grant[1])            rr_ptr_q <= 2'd2;
+          else if (grant[2])            rr_ptr_q <= 2'd0;
+        end
+      end
+    end
+    // -------- P2: QoS weighted round-robin (deficit credits; grant share ~ weights) --------
+    else begin : g_policy
+      localparam logic signed [9:0] WV [3] = '{10'(W_CPU), 10'(W_ACC0), 10'(W_ACC1)};
+      localparam logic signed [9:0] WTOT   = 10'(W_CPU + W_ACC0 + W_ACC1);
+      logic signed [9:0] cred_q [3];
+      always_comb begin
+        logic signed [9:0] best; logic [1:0] bi; logic found;
+        best = '0; bi = 2'd0; found = 1'b0;
+        for (int i = 0; i < 3; i++)
+          if (req[i] && (!found || cred_q[i] > best)) begin best = cred_q[i]; bi = 2'(i); found = 1'b1; end
+        grant = 3'b000;
+        if (found) unique case (bi)
+          2'd0:    grant = 3'b001;
+          2'd1:    grant = 3'b010;
+          default: grant = 3'b100;
+        endcase
+      end
+      always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) for (int i = 0; i < 3; i++) cred_q[i] <= '0;
+        else if (fpu_req_o & fpu_gnt_i) begin
+          for (int i = 0; i < 3; i++) begin
+            if      (grant[i]) cred_q[i] <= cred_q[i] + WV[i] - WTOT;
+            else if (req[i])   cred_q[i] <= cred_q[i] + WV[i];
+          end
+        end
+      end
+    end
+  endgenerate
 
-  assign fpu_req_o      = issue_cpu | issue_dma;
-  assign fpu_operands_o = issue_dma ? dma_operands_i : cpu_operands_i;
-  assign fpu_op_o       = issue_dma ? dma_op_i       : cpu_op_i;
-  assign fpu_flags_o    = issue_dma ? dma_flags_i    : cpu_flags_i;
-  assign fpu_tag_o      = issue_dma;          // tag the issued op with its owner (1 = DMA, 0 = CPU)
-  assign fma_active_o   = dma_req_i | (inflight_q != '0);
+  // ===================== shared datapath (policy-independent) =====================
+  wire issue_cpu  = grant[0];
+  wire issue_acc0 = grant[1];
+  wire issue_acc1 = grant[2];
 
-  assign cpu_gnt_o = issue_cpu & fpu_gnt_i;
-  assign dma_gnt_o = issue_dma & fpu_gnt_i;
+  assign fpu_req_o      = |grant;
+  assign fpu_operands_o = issue_acc1 ? dma1_operands_i : issue_acc0 ? dma_operands_i : cpu_operands_i;
+  assign fpu_op_o       = issue_acc1 ? dma1_op_i       : issue_acc0 ? dma_op_i       : cpu_op_i;
+  assign fpu_flags_o    = issue_acc1 ? dma1_flags_i    : issue_acc0 ? dma_flags_i    : cpu_flags_i;
+  assign fpu_tag_o      = issue_acc1 ? 2'd2 : issue_acc0 ? 2'd1 : 2'd0;
+  assign fma_active_o   = dma_req_i | dma1_req_i | (inflight_q != '0);
 
-  // ---- Response: route by the tag returned with the result (out-of-order safe) ----
-  wire resp_owner = fpu_tag_i;
-  assign cpu_rvalid_o = fpu_rvalid_i & ~resp_owner;
-  assign dma_rvalid_o = fpu_rvalid_i &  resp_owner;
-  assign cpu_rdata_o  = fpu_rdata_i;          // consumer latches only on its own rvalid
-  assign dma_rdata_o  = fpu_rdata_i;
-  assign cpu_rflags_o = fpu_rflags_i;
-  assign dma_rflags_o = fpu_rflags_i;
+  assign cpu_gnt_o  = issue_cpu  & fpu_gnt_i;
+  assign dma_gnt_o  = issue_acc0 & fpu_gnt_i;
+  assign dma1_gnt_o = issue_acc1 & fpu_gnt_i;
 
-  // ---- In-flight counter (drives fma_active_o for the FMA clock-gate) ----
-  wire issue = fpu_req_o & fpu_gnt_i;
+  assign cpu_rvalid_o  = fpu_rvalid_i & (fpu_tag_i == 2'd0);
+  assign dma_rvalid_o  = fpu_rvalid_i & (fpu_tag_i == 2'd1);
+  assign dma1_rvalid_o = fpu_rvalid_i & (fpu_tag_i == 2'd2);
+  assign cpu_rdata_o  = fpu_rdata_i;  assign cpu_rflags_o  = fpu_rflags_i;
+  assign dma_rdata_o  = fpu_rdata_i;  assign dma_rflags_o  = fpu_rflags_i;
+  assign dma1_rdata_o = fpu_rdata_i;  assign dma1_rflags_o = fpu_rflags_i;
+
+  wire fire = fpu_req_o & fpu_gnt_i;
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) inflight_q <= '0;
-    else         inflight_q <= inflight_q + 3'(issue) - 3'(fpu_rvalid_i);
+    else         inflight_q <= inflight_q + 4'(fire) - 4'(fpu_rvalid_i);
   end
 
 endmodule

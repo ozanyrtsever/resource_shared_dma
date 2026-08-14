@@ -136,6 +136,15 @@ module core_v_mini_mcu
       ,output logic             apu_ext_rvalid_o
       ,output logic [31:0]      apu_ext_rdata_o
       ,output logic [4:0]       apu_ext_rflags_o
+      ,input  logic             apu_ext1_req_i
+      ,output logic             apu_ext1_gnt_o
+      ,input  logic [2:0][31:0] apu_ext1_operands_i
+      ,input  logic [5:0]       apu_ext1_op_i
+      ,input  logic [14:0]      apu_ext1_flags_i
+      ,output logic             apu_ext1_rvalid_o
+      ,output logic [31:0]      apu_ext1_rdata_o
+      ,output logic [4:0]       apu_ext1_rflags_o
+
     `endif
 
 );
@@ -333,7 +342,7 @@ module core_v_mini_mcu
       .irq_id_o(irq_id_out),
       .debug_req_i(debug_core_req),
       .core_sleep_o(core_sleep)
-            `ifdef COPROC_FPU_SHARE
+      `ifdef COPROC_FPU_SHARE
         ,.apu_ext_req_i
         ,.apu_ext_gnt_o
         ,.apu_ext_operands_i
@@ -342,6 +351,15 @@ module core_v_mini_mcu
         ,.apu_ext_rvalid_o
         ,.apu_ext_rdata_o
         ,.apu_ext_rflags_o
+        ,.apu_ext1_req_i
+        ,.apu_ext1_gnt_o
+        ,.apu_ext1_operands_i
+        ,.apu_ext1_op_i
+        ,.apu_ext1_flags_i
+        ,.apu_ext1_rvalid_o
+        ,.apu_ext1_rdata_o
+        ,.apu_ext1_rflags_o
+
       `endif
 
 

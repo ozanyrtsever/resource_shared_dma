@@ -79,6 +79,15 @@ module cv32e40px_xif_wrapper
       ,output logic             apu_ext_rvalid_o
       ,output logic [31:0]      apu_ext_rdata_o
       ,output logic [4:0]       apu_ext_rflags_o
+      ,input  logic             apu_ext1_req_i
+      ,output logic             apu_ext1_gnt_o
+      ,input  logic [2:0][31:0] apu_ext1_operands_i
+      ,input  logic [5:0]       apu_ext1_op_i
+      ,input  logic [14:0]      apu_ext1_flags_i
+      ,output logic             apu_ext1_rvalid_o
+      ,output logic [31:0]      apu_ext1_rdata_o
+      ,output logic [4:0]       apu_ext1_rflags_o
+
   `endif
 
 );
@@ -269,6 +278,15 @@ module cv32e40px_xif_wrapper
         ,.apu_ext_rvalid_o
         ,.apu_ext_rdata_o
         ,.apu_ext_rflags_o
+        ,.apu_ext1_req_i
+        ,.apu_ext1_gnt_o
+        ,.apu_ext1_operands_i
+        ,.apu_ext1_op_i
+        ,.apu_ext1_flags_i
+        ,.apu_ext1_rvalid_o
+        ,.apu_ext1_rdata_o
+        ,.apu_ext1_rflags_o
+
       `endif
 
   );

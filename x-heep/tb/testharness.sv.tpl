@@ -131,9 +131,9 @@ module testharness #(
   logic dlc_dir_o;
 
   // Custom accelerator signal (dma_sum_accel.sv)
-  logic accel_done;          // <-- YENİ
   `ifdef COPROC_FPU_SHARE
   // Coprocessor APU port (accel <-> shared FMA arbiter)
+  logic accel_done;          // <-- YENİ
   logic             accel_apu_req;
   logic             accel_apu_gnt;
   logic [2:0][31:0] accel_apu_operands;
@@ -142,6 +142,16 @@ module testharness #(
   logic             accel_apu_rvalid;
   logic [31:0]      accel_apu_rdata;
   logic [4:0]       accel_apu_rflags;
+  logic             accel1_done;
+  logic             accel1_apu_req;
+  logic             accel1_apu_gnt;
+  logic [2:0][31:0] accel1_apu_operands;
+  logic [5:0]       accel1_apu_op;
+  logic [14:0]      accel1_apu_flags;
+  logic             accel1_apu_rvalid;
+  logic [31:0]      accel1_apu_rdata;
+  logic [4:0]       accel1_apu_rflags;
+
 `endif
 
 
@@ -396,9 +406,9 @@ module testharness #(
       .ext_dma_slot_rx_i(ext_dma_slot_rx),
       .ext_dma_stop_i('0),
       .intr_ext_peripheral_i(gpio[31]),
-      .hw_fifo_done_i({{(core_v_mini_mcu_pkg::DMA_CH_NUM - 1) {1'b0}}, accel_done, dlc_done}),
+      .hw_fifo_done_i({{(core_v_mini_mcu_pkg::DMA_CH_NUM - 2) {1'b0}}, accel1_done, accel_done, dlc_done}),
       .dma_done_o(dma_busy)
-                  `ifdef COPROC_FPU_SHARE
+      `ifdef COPROC_FPU_SHARE
         ,.apu_ext_req_i     (accel_apu_req)
         ,.apu_ext_gnt_o     (accel_apu_gnt)
         ,.apu_ext_operands_i(accel_apu_operands)
@@ -407,6 +417,16 @@ module testharness #(
         ,.apu_ext_rvalid_o  (accel_apu_rvalid)
         ,.apu_ext_rdata_o   (accel_apu_rdata)
         ,.apu_ext_rflags_o  (accel_apu_rflags)
+        ,.apu_ext1_req_i     (accel1_apu_req)
+        ,.apu_ext1_gnt_o     (accel1_apu_gnt)
+        ,.apu_ext1_operands_i(accel1_apu_operands)
+        ,.apu_ext1_op_i      (accel1_apu_op)
+        ,.apu_ext1_flags_i   (accel1_apu_flags)
+        ,.apu_ext1_rvalid_o  (accel1_apu_rvalid)
+        ,.apu_ext1_rdata_o   (accel1_apu_rdata)
+        ,.apu_ext1_rflags_o  (accel1_apu_rflags)
+
+
       `endif
 
 
@@ -431,10 +451,31 @@ module testharness #(
       .fpu_rdata_i   (accel_apu_rdata),
       .fpu_rflags_i  (accel_apu_rflags)
   );
+
+    // acc1: second FP dot-product accelerator on DMA HW-FIFO channel 2, sharing the SAME FMA
+  dma_fp_dot_accel_is #(.MAXN(1024)) dma_fp_dot_accel1_i (
+      .clk_i         (clk_i),
+      .rst_ni        (rst_ni),
+      .hw_fifo_req_i (hw_fifo_req[2]),
+      .hw_fifo_resp_o(hw_fifo_resp[2]),
+      .done_o        (accel1_done),
+      .fpu_req_o     (accel1_apu_req),
+      .fpu_gnt_i     (accel1_apu_gnt),
+      .fpu_operands_o(accel1_apu_operands),
+      .fpu_op_o      (accel1_apu_op),
+      .fpu_flags_o   (accel1_apu_flags),
+      .fpu_rvalid_i  (accel1_apu_rvalid),
+      .fpu_rdata_i   (accel1_apu_rdata),
+      .fpu_rflags_i  (accel1_apu_rflags)
+  );
+
 `else
   // Baseline (stock X-HEEP): accel yok — kanal-1 HW-FIFO'yu sustur
   assign accel_done      = 1'b0;
   assign hw_fifo_resp[1] = '0;
+  assign accel1_done     = 1'b0;
+  assign hw_fifo_resp[2] = '0;
+
 `endif
 
 

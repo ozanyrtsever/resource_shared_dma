@@ -30,6 +30,7 @@ core is published; `CHANGES-to-xheep.patch` is the exact diff applied to the ven
 | **Full network: LeNet-300-100 on MNIST** | bit-exact vs CPU & NumPy, **4.80×** (552 228 vs 2 654 927 cyc, whole matrix in one 2D transfer), model ~98 % |
 | **Co-execution (ML ∥ CPU FIR-DSP), shared FMA** | both bit-exact; under contention accel GEMV +14.3 % / CPU +3.9 % (bus, not FMA-starvation); inference hidden in idle FMA cycles → **1.20×** |
 | **Cycle-budget decomposition (L=0)** | of the 552 228-cyc accel forward: **gemv 96.6 %** (= 2.00 cyc/MAC) · load 0.3 % · setup 0.5 % · act 2.6 % — compute-bound, offload overhead <1 % |
+| **Two coprocessors on one FMA** (parametric 3-requestor arbiter) | M-split GEMV, bit-exact; **1.48× GEMV** throughput (2.05 → 1.37 cyc/MAC), FMA-issue util ~50 %→~75 %, channels balanced ~1 %; CPU-priority holds: concurrent CPU-FIR +0 % / +11 % under 1 / 2 accelerators (bus, not FMA-starvation) — **still no 2nd FPU** |
 
 ## Repository map
 ```
@@ -38,7 +39,7 @@ CHANGES-to-xheep.patch          exact diff to X-HEEP vendored/template files
 example_model/                  model-export scripts (gen_lenet_mnist.py trains+exports LeNet/MNIST)
 x-heep/
   hw/vendor/xheep/cv32e40px/rtl/
-    dma_apu_arbiter.sv          *** THE contribution: CPU-priority FMA-sharing arbiter ***
+    dma_apu_arbiter.sv          *** THE contribution: FMA-sharing arbiter — parametric 3-requestor (CPU+acc0+acc1), swappable policy (CPU-strict / all-RR / QoS) ***
     cv32e40px_top.sv            arbiter instantiated + wired between core APU and shared fp_wrapper
   tb/
     dma_fp_dot_accel_is.sv      runtime-programmable GEMV coprocessor (reads N,M from a stream header)
@@ -56,6 +57,7 @@ x-heep/
     ml_dual/        dual-stream: CPU classifies one digit while accel classifies another
     ml_rt_gemv/     runtime-N/M bring-up
     ml_rt_gemv_2d/  2D single-transfer GEMV validation (whole M×N > 65535 in ONE 2D DMA transfer)
+    perf_bench/     *** compact end-to-end benchmark: single acc / contention / DUAL (2 accel, M-split) / 3-way, all bit-exact ***
     ml_conv1[_full]/ convolution via im2col→GEMV
     y2_fpdotp_test/ Y2: first on-SoC shared-FMA dot product
     y3_{sweep,contention,independent}/  Y3 measurement kernels (length, concurrency, contention)
