@@ -42,6 +42,7 @@ filesets:
     - testharness.sv
     - dma_sum_accel.sv
     - dma_fp_dot_accel.sv
+    - xbuf_ram.sv
     - dma_fp_dot_accel_is.sv
     - ext_xbar.sv
     - ext_bus.sv

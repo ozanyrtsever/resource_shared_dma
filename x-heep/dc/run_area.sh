@@ -1,44 +1,99 @@
 #!/usr/bin/env bash
 #=============================================================================
-# One command to synthesize EVERY module for the "no second FPU" area study.
-# Each module runs in a FRESH dc_shell process (zero state carryover) with its
-# own WORK dir. Prints a summary table + the area comparison at the end.
+# One command for the whole "no second FPU" area study (Design Compiler).
+# Runs every point in a FRESH dcnxt_shell (zero state carryover) with its own WORK
+# dir, then prints the summary tables. Run from anywhere; cd's to x-heep root.
 #
-#     bash dc/run_area.sh                 # the 3 key modules
-#     MODULES="cv32e40px_top" bash dc/run_area.sh   # override the list
+#   bash dc/run_area.sh
+#
+# Matrix (10 runs):
+#   (a) full FPU  cv32e40px_fp_wrapper  @ L = 0..5        -> 6 runs
+#       (each run's *_hier.rpt also gives the FMA-alone area: fpnew_fma_multi row)
+#   (c) arbiter   dma_apu_arbiter       @ POLICY = 0,1,2  -> 3 runs
+#   (d) accel     dma_fp_dot_accel_is   (LOGIC only)      -> 1 run
+#
+# Prereqs on this server:
+#   - Edit LIB_DB at the top of dc/synth_area.tcl to the standard-cell .db here.
+#   - The RTL edit that factors x_buf into tb/xbuf_ram.sv must be applied (so the
+#     accel instantiates u_xbuf); dc/rtl_accel_is.f omits xbuf_ram to black-box it.
 #=============================================================================
 set -u
-cd "$(dirname "$0")/.."                     # -> x-heep root, wherever invoked from
+cd "$(dirname "$0")/.."                     # -> x-heep root
 mkdir -p dc/reports
-
-MODULES="${MODULES:-cv32e40px_fp_wrapper dma_apu_arbiter dma_fp_dot_accel}"
 CLK_NS="${CLK_NS:-10.0}"
+DCSH="${DCSH:-dcnxt_shell}"                  # DC shell binary (dcnxt_shell = DC NXT).
+                                            # override w/ full path if not in PATH, e.g.:
+                                            #   DCSH=/2tb/ECE/synopsys/2025-26/bin/dcnxt_shell bash dc/run_area.sh
 
-for TOP in $MODULES; do
-    echo "########################  SYNTH: $TOP  ########################"
-    rm -rf "dc/work/$TOP" "dc/reports/area_${TOP}.rpt"      # clean stale outputs
-    TOP="$TOP" CLK_NS="$CLK_NS" dc_shell -f dc/synth_area.tcl 2>&1 | tee "dc/reports/log_${TOP}.txt"
+# --- run one point in a fresh dcnxt_shell.  $1 = RUN label (must equal what the tcl
+#     builds from TOP+suffix); remaining args = env assignments (incl TOP) --------
+runone() {
+    local RUN="$1"; shift
+    echo "########################  SYNTH: $RUN  ########################"
+    rm -rf "dc/work/$RUN" "dc/reports/area_${RUN}.rpt" "dc/reports/area_${RUN}_hier.rpt"
+    env "$@" CLK_NS="$CLK_NS" "$DCSH" -f dc/synth_area.tcl 2>&1 | tee "dc/reports/log_${RUN}.txt"
+}
+
+# ============================== RUN THE MATRIX ==============================
+# (a) full FPU + FMA-in-context, ADDMUL-latency sweep
+for L in 0 1 2 3 4 5; do
+    runone "cv32e40px_fp_wrapper_L$L"  TOP=cv32e40px_fp_wrapper  L="$L"
 done
+# (c) arbiter, three policies
+for P in 0 1 2; do
+    runone "dma_apu_arbiter_P$P"       TOP=dma_apu_arbiter       POLICY="$P"
+done
+# (d) accelerator, LOGIC only (x_buf black-boxed as a 32 KB SRAM macro)
+runone "dma_fp_dot_accel_is"           TOP=dma_fp_dot_accel_is
 
-# ------------------------------- summary ------------------------------------
+# ================================ SUMMARY ==================================
+# Total cell area from a flat area report.
 area_of() { grep -i "Total cell area" "dc/reports/area_$1.rpt" 2>/dev/null | tail -1 | awk '{print $NF}'; }
+# FMA-alone (fpnew_fma_multi) absolute area from the fp_wrapper hierarchy report at latency L.
+fma_of()  { awk '/fpnew_fma_multi/ && $1 ~ /^[0-9]/ {print $1; exit}' \
+              "dc/reports/area_cv32e40px_fp_wrapper_L$1_hier.rpt" 2>/dev/null; }
 
 echo
-echo "########################  AREA SUMMARY (clk=${CLK_NS} ns)  ########################"
-printf "%-26s %14s\n" "module" "area(um^2)"
-for TOP in $MODULES; do printf "%-26s %14s\n" "$TOP" "$(area_of "$TOP")"; done
+echo "##################  AREA SUMMARY  (TSMC40, clk=${CLK_NS} ns)  ##################"
+echo
+echo "--- (a) Full FPU (cv32e40px_fp_wrapper) and FMA (fpnew_fma_multi, from hier), by ADDMUL latency L ---"
+printf "%3s %18s %18s %18s\n" "L" "full FPU (um^2)" "FMA (um^2)" "rest = FPU-FMA"
+for L in 0 1 2 3 4 5; do
+    f=$(area_of "cv32e40px_fp_wrapper_L$L"); m=$(fma_of "$L")
+    if [ -n "${f:-}" ] && [ -n "${m:-}" ]; then
+        r=$(awk -v a="$f" -v b="$m" 'BEGIN{printf "%.2f", a-b}')
+    else
+        r="?"
+    fi
+    [ -z "${m:-}" ] && m="MISSING: FMA row ungrouped -> run 'TOP=fpnew_fma_multi L=$L dcnxt_shell -f dc/synth_area.tcl'"
+    printf "%3s %18s %18s %18s\n" "$L" "${f:-?}" "$m" "$r"
+done
 
-fma=$(area_of cv32e40px_fp_wrapper)
-arb=$(area_of dma_apu_arbiter)
-acc=$(area_of dma_fp_dot_accel)
-if [ -n "${fma:-}" ] && [ -n "${arb:-}" ] && [ -n "${acc:-}" ]; then
-  awk -v f="$fma" -v a="$arb" -v c="$acc" 'BEGIN{
-    if (f+0>0) {
-      printf "\n# AVOIDED  one FMA (fp_wrapper) : %12.2f\n", f
-      printf "# ADDED    arbiter              : %12.2f  (%.1f%% of one FMA)\n", a, 100*a/f
-      printf "# ADDED    accel FSM            : %12.2f  (%.1f%% of one FMA)\n", c, 100*c/f
-      printf "# SAVING = FMA - arbiter        : %12.2f  (accel FSM is common to both designs)\n", f-a
-    }
-  }'
-fi
-echo "########################  DONE  ########################"
+echo
+echo "--- (c) Arbiter (dma_apu_arbiter), per policy ---"
+printf "%-26s %18s\n" "policy" "area (um^2)"
+printf "%-26s %18s\n" "P0  CPU-strict + accRR" "$(area_of dma_apu_arbiter_P0)"
+printf "%-26s %18s\n" "P1  all round-robin"    "$(area_of dma_apu_arbiter_P1)"
+printf "%-26s %18s\n" "P2  QoS weighted 4:2:1" "$(area_of dma_apu_arbiter_P2)"
+
+echo
+echo "--- (d) Accelerator (dma_fp_dot_accel_is), LOGIC only (buffer excluded) ---"
+printf "%-26s %18s\n" "accel logic" "$(area_of dma_fp_dot_accel_is)"
+echo "   input buffer x_buf = MAXB*MAXN*32b = 8*1024*32 = 262144 b = 32 KB single-port SRAM /accel"
+echo "   two accelerators on the SoC -> 64 KB SRAM total. Get the macro area from the memory compiler"
+echo "   (40nm 6T rough estimate ~0.11 mm^2 for 32 KB). Never counted as flip-flops."
+
+echo
+echo "--- 'no second FPU' comparison ---"
+FMA0=$(fma_of 0); FPU0=$(area_of cv32e40px_fp_wrapper_L0)
+ARB=$(area_of dma_apu_arbiter_P0); ACC=$(area_of dma_fp_dot_accel_is)
+awk -v fma="$FMA0" -v fpu="$FPU0" -v arb="$ARB" -v acc="$ACC" 'BEGIN{
+    if (fma=="" || arb=="") { print "  (need FMA and arbiter areas)"; exit }
+    printf "  AVOIDED  a dedicated FMA (fpnew_fma_multi, L=0) : %12.2f um^2\n", fma
+    if (fpu!="") printf "  AVOIDED  a full 2nd FPU (fp_wrapper,   L=0) : %12.2f um^2\n", fpu
+    printf "  ADDED    the sharing arbiter (P0)              : %12.2f um^2  (%.1f%% of one FMA)\n", arb, 100*arb/fma
+    printf "  SAVING   FMA - arbiter                         : %12.2f um^2\n", fma-arb
+    if (acc!="") printf "  (accel logic = %.2f um^2 is common to BOTH designs -- shared or dedicated FMA)\n", acc
+    print  "  -> sharing the CPU FMA costs a small arbiter instead of a whole FMA/FPU."
+}'
+echo "##################################  DONE  ##################################"

@@ -1,0 +1,33 @@
+Warning: Design 'dma_fp_dot_accel_is' has '1' unresolved references. For more detailed information, use the "link" command. (UID-341)
+ 
+****************************************
+Report : area
+Design : dma_fp_dot_accel_is
+Version: Y-2026.03-SP1
+Date   : Sun Aug 16 13:31:20 2026
+****************************************
+
+Library(s) Used:
+
+    sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c (File: /2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db)
+
+Number of ports:                          230
+Number of nets:                          1988
+Number of cells:                         1873
+Number of combinational cells:           1451
+Number of sequential cells:               422
+Number of macros/black boxes:               0
+Number of buf/inv:                        337
+Number of references:                      52
+
+Combinational area:               2041.922389
+Buf/Inv area:                      223.759206
+Noncombinational area:            2418.897694
+Macro/Black Box area:                0.000000
+Net Interconnect area:               0.000000
+
+Total cell area:                  4460.820083
+Total area:                       4460.820083
+
+Information: This design contains black box (unknown) components. (RPT-8)
+1

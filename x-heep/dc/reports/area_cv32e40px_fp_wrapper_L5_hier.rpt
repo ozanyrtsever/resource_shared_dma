@@ -1,0 +1,47 @@
+ 
+****************************************
+Report : area
+Design : cv32e40px_fp_wrapper_FPU_ADDMUL_LAT5
+Version: Y-2026.03-SP1
+Date   : Sun Aug 16 13:29:19 2026
+****************************************
+
+Information: Updating design information... (UID-85)
+Library(s) Used:
+
+    sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c (File: /2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db)
+
+Number of ports:                          355
+Number of nets:                          8790
+Number of cells:                         8172
+Number of combinational cells:           7653
+Number of sequential cells:               518
+Number of macros/black boxes:               0
+Number of buf/inv:                       1157
+Number of references:                      97
+
+Combinational area:              11589.194453
+Buf/Inv area:                      746.928021
+Noncombinational area:            2748.312088
+Macro/Black Box area:                0.000000
+Net Interconnect area:               0.000000
+
+Total cell area:                 14337.506541
+Total area:                      14337.506541
+
+Hierarchical area distribution
+------------------------------
+
+                                  Global cell area            Local cell area
+                                  -------------------  ----------------------------- 
+Hierarchical cell                 Absolute    Percent  Combi-      Noncombi-  Black-
+                                  Total       Total    national    national   boxes   Design
+--------------------------------  ----------  -------  ----------  ---------  ------  ------------------------------------
+cv32e40px_fp_wrapper_FPU_ADDMUL_LAT5
+                                  14337.5065    100.0   5302.8696  1513.0080  0.0000  cv32e40px_fp_wrapper_FPU_ADDMUL_LAT5
+i_fpnew_bulk/gen_operation_groups[0].i_opgroup_block/gen_merged_slice.i_multifmt_slice/gen_num_lanes[0].active_lane.lane_instance.i_fpnew_fma_multi
+                                   7521.6289     52.5   6286.3248  1235.3040  0.0000  fpnew_fma_multi_10_00000005_1_565242
+--------------------------------  ----------  -------  ----------  ---------  ------  ------------------------------------
+Total                                                  11589.1945  2748.3121  0.0000
+
+1

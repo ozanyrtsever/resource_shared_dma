@@ -1,0 +1,30 @@
+ 
+****************************************
+Report : area
+Design : dma_apu_arbiter_ARB_POLICY2_W_CPU4_W_ACC02_W_ACC11
+Version: Y-2026.03-SP1
+Date   : Sun Aug 16 13:30:43 2026
+****************************************
+
+Library(s) Used:
+
+    sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c (File: /2tb/home/oyurtsever/x-heep/dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db)
+
+Number of ports:                          635
+Number of nets:                           956
+Number of cells:                          558
+Number of combinational cells:            524
+Number of sequential cells:                34
+Number of macros/black boxes:               0
+Number of buf/inv:                        182
+Number of references:                      43
+
+Combinational area:                732.244812
+Buf/Inv area:                      118.104003
+Noncombinational area:             195.350408
+Macro/Black Box area:                0.000000
+Net Interconnect area:               0.000000
+
+Total cell area:                   927.595220
+Total area:                        927.595220
+1

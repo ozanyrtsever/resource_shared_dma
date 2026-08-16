@@ -525,9 +525,11 @@ so with a DMA and, crucially, **shares the host core's existing FMA** rather tha
 **(B) Shared / time-multiplexed floating-point units.** Sharing an FPU is established for *peer
 cores* with *fair* arbitration: US Patent 6,148,395 (multiple CPUs share one FPU via a dispatch
 arbiter, result steering); the "Florian" shared-FPU architecture (IJERT 2025, *verify*) and
-many-soft-core shared FPUs (round-robin FIFO); and an energy-efficient dual-core RISC-V that shares
-a *MAC* unit with CPU priority (MDPI Computers, 2024, *verify*) — but that MAC is *integer* and the
-sharers are two *peer cores*. Related patents cover shared MAC units (US 6,223,196) and
+many-soft-core shared FPUs (round-robin FIFO); and — the closest prior art — Tanase's energy-efficient
+dual-core RISC-V that shares a *MAC* unit with CPU-priority arbitration for an opportunistic NPU
+(C. A. Tanase, *Computers* 2026, 15(4), 219) — but that MAC is a *single-cycle integer* unit, the sharers
+are two *peer cores* plus the NPU, and the whole system is a *SystemC model* (no FPGA/silicon; area/power
+extrapolated). A full advantages/gaps comparison is in `COMPARISON_vs_tanase2026.md`. Related patents cover shared MAC units (US 6,223,196) and
 priority-toggled shared functional units (US 7,533,248). This thesis differs in being **asymmetric
 (strict CPU priority with an explicit drain/resume), between a CPU and a DMA coprocessor (not peer
 cores), on the floating-point FMA (not an integer MAC)**.
@@ -700,29 +702,40 @@ our runs; tapping it would have been both unrepresentative — a separate bus �
 ### The area cost: sharing versus a dedicated FMA
 
 The central quantitative claim — that sharing the CPU's FMA avoids the area of a second one — was
-measured in Synopsys Design Compiler (TSMC 40 nm G, RVT, SS/0.81 V/125 °C corner, 100 MHz; DesignWare
-arithmetic; SYNTHESIS defined; each module synthesized **standalone** so no logic is optimized away).
-All timing slacks are positive (fp_wrapper +1.79 ns, arbiter +7.48 ns, accelerator +7.07 ns), so the
-areas are area-optimal rather than timing-inflated.
+measured in Synopsys Design Compiler NXT (TSMC 40 nm G, RVT, SS/0.81 V/125 °C corner, 100 MHz;
+DesignWare arithmetic; each module synthesized **standalone** so no logic is optimized away). Every
+module was re-synthesized in one consistent run of the current 3-requestor design, and the ADD/MUL
+pipeline latency L was swept 0..5; at this relaxed clock all timing slacks are large, so the areas are
+area-optimal rather than timing-inflated. Full per-L and per-policy tables are in `AREA_REPORT.md`.
 
-| Block | Role | Cell area (µm²) | Flops |
-|---|---|---:|---:|
-| `cv32e40px_fp_wrapper` (fpnew FMA) | the FMA we **reuse** (a dedicated design would duplicate it) | **12 812** | 299 |
-| `dma_apu_arbiter` | the sharing logic we **add** | **321** | 4 |
-| `dma_fp_dot_accel` | the accelerator datapath (present either way) | 1 051 | 115 |
+| Block | Role | Cell area (µm², L = 0) |
+|---|---|---:|
+| `cv32e40px_fp_wrapper` (the whole FPU) | what a "just add a second FPU" design would duplicate | **12 455** |
+| `fpnew_fma_multi` (the FMA lane alone) | the unit the coprocessor actually **reuses** | **5 789** |
+| `dma_apu_arbiter`, P0 CPU-strict | the sharing logic we **add** (default) | **452.94** |
+| `dma_apu_arbiter`, P1 full round-robin | (removes CPU priority) | 465.07 |
+| `dma_apu_arbiter`, P2 QoS weighted | (tunable-share variant) | 927.60 |
+| `dma_fp_dot_accel_is` logic | the accelerator datapath (present either way) | 4 461 |
+| `x_buf` input buffer | a 32 KB SRAM macro (both designs) | ~0.11 mm² (memory compiler) |
 
-For context, the FPU-enabled core (`cv32e40px_top`, `FPU=1`) is 65 755 µm²; enabling the FPU roughly
-doubles the core (33 935 → 65 755 µm²) and the FMA alone is ≈19.5 % of it — confirming the FPU is the
-dominant block worth not replicating.
+The FMA lane is about **half of the whole FPU** (5 789 of 12 455 µm²); the other half is
+divide/square-root, compare/min-max and format conversion — hardware a multiply-add coprocessor does
+not need. So the honest "one FMA" the coprocessor avoids duplicating is **5 789 µm²**.
 
 The comparison is therefore stark. A dedicated dot-product accelerator would instantiate its own FMA
-(**+12 812 µm²**); our design instead adds only the CPU-priority arbiter (**+321 µm²**). The
-accelerator FSM (1 051 µm²) is common to both and cancels. The net area saved by sharing is one whole
-FMA — **12 491 µm²** — and the price of sharing is an arbiter that is **just 2.5 % of one FMA
-(0.49 % of the FPU-enabled core)**; avoiding the second FMA is worth roughly **40× the arbiter it
-costs**. This is the thesis's "no second FPU" claim, quantified: the shared-FMA coprocessor delivers
-the dot-product acceleration characterized in the length and latency studies above at essentially
-**zero added floating-point-datapath area**.
+(**+5 789 µm²**); our design instead adds only the CPU-priority arbiter (**+452.94 µm²**). The
+accelerator logic (4 461 µm²) and its 32 KB input SRAM are common to both and cancel. The net area
+saved by sharing is one whole FMA minus the arbiter — **5 336 µm² per coprocessor** — and the price of
+sharing is an arbiter that is **just 7.8 % of one FMA (3.6 % of the whole FPU)**. For the two-coprocessor
+design a single 3-requestor arbiter replaces **two** FMAs, saving **11 125 µm²**. Because the arbiter
+contains no FMA, its area is independent of the pipeline latency, whereas the FMA grows +30 % from L = 0
+to L = 5 (5 789 → 7 521 µm²) — so sharing is *more* favourable at deeper pipelines (the arbiter falls
+from 7.8 % to 6.0 % of the FMA). Swapping the grant policy costs area only if you want it: CPU-strict and
+full round-robin are ~453–465 µm², while the QoS-weighted policy (deficit-credit counters + an argmax) is
+~928 µm², about twice the others. This is the thesis's "no second FPU" claim, quantified: the shared-FMA
+coprocessor delivers the dot-product, batched-GEMM and full-network acceleration characterized above at
+the cost of a ~453 µm² arbiter instead of a whole ~5 789 µm² FMA — essentially **zero added
+floating-point-datapath area**.
 
 ### Real ML kernel: a dense layer, and why the feeding dataflow decides the win
 
@@ -973,9 +986,21 @@ genuine three-way, out-of-order traffic. **CPU priority still holds where it mus
 FIR filter slows 0 % against one coprocessor and 11 % against two — and that 11 % is operand-bus
 contention from two DMA streams, never FMA starvation — while the coprocessors absorb the whole cost of
 sharing (+11 % and +61 %). That asymmetry is the design intent made measurable: the CPU's own
-floating-point work is protected by construction, and the coprocessors are best-effort. Comparing the
-three policies (0/1/2) on this same benchmark — the CPU-priority guarantee traded against peer-fairness
-and against a programmable QoS knob — is the immediate next measurement.
+floating-point work is protected by construction, and the coprocessors are best-effort.
+
+Comparing the three policies (0/1/2), sweeping the FMA latency L = 0..5, and moving from this toy MLP to
+the real **LeNet-300-100** network were the subsequent measurements, and they are now complete (full,
+self-contained tables in `PERF_SWEEP_REPORT.md` and `LENET_SWEEP_REPORT.md`). Their headline findings, with
+the coprocessor run **batched** (B = 8) so the shared FMA — not the operand bus — is the bottleneck: **(i)**
+batching flips the memory-bound single-image GEMV into a compute-bound GEMM (LeNet, L = 0: 1.12 cyc/MAC,
+≈ 88 % FMA-issue utilisation, **8.34× vs the CPU**, all bit-exact, and 8/8 MNIST images classified
+correctly); **(ii)** the **second coprocessor is a latency-hiding device** whose value grows with FMA
+latency — only ~1.12× at L = 0 (one accelerator already fills the unit) but **~1.99× at L ≥ 2**, keeping the
+dual **3.1×–9.1× vs the CPU** across the whole latency range; and **(iii)** the **arbiter policy is decisive
+precisely when the FMA is saturated** (compute-bound): CPU-strict holds the CPU's own job within ≤ 9 % even
+under two accelerators, full round-robin costs it more, and the QoS weights dial the CPU's slow-down from
++13 % to +103 % and the two accelerators' balance (channel imbalance 223 → ~762 k cycles). Every trend
+measured on the toy MLP reproduces on the real network, with a higher headline speedup.
 
 ---
 
@@ -1124,9 +1149,9 @@ concurrency study (independent non-FP CPU work sees ≈0 added latency; the resi
 memory-bus arbitration, not FMA sharing); the **FMA-latency drain sweep** (§11: flat ≈14–21-cycle,
 bus-dominated cost for L ≤ 3, a knee near L = 4, rising to ≈16% at L = 5, bit-correct and bounded at
 every latency — the CPU-priority guarantee across the full pipeline-depth range); the audited
-single-define clean revert to stock X-HEEP; and the **area study** (§11: Design Compiler, TSMC 40 nm —
-sharing avoids a 12 812 µm² FMA at the cost of a 321 µm² arbiter = 2.5 % of one FMA / 0.49 % of the
-FPU-enabled core; net saving ≈ one FMA). *Remaining (optional):* the pipelined multi-partial-accumulator
+single-define clean revert to stock X-HEEP; and the **area study** (§11: Design Compiler NXT, TSMC 40 nm —
+sharing avoids a 5 789 µm² FMA at the cost of a 453 µm² arbiter = 7.8 % of one FMA / 3.6 % of the whole
+FPU; net saving 5 336 µm² per coprocessor, 11 125 µm² for the dual). *Remaining (optional):* the pipelined multi-partial-accumulator
 accelerator, a throughput enhancement to push the per-element term toward one cycle at L ≥ 1 — the core
 measurement and area programme is otherwise complete.
 
