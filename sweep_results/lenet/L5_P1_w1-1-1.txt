@@ -1,0 +1,19 @@
+############################################################
+# L5_P1_w1-1-1   L(lat)=5  policy=1  weights(CPU:ACC0:ACC1)=1:1:1
+# status=ok   Sun Aug 16 02:51:08 PM +03 2026
+############################################################
+=== PERF LENET  LeNet-300-100 784-300-100-10  batch B=8  (266200 MAC/img, 2129600 MAC/batch) ===
+[A] CPU golden (8 imgs)          : 21128412 cyc
+[B] accel B=1 (GEMV,mem-bound)    : 1888768 cyc  bit-exact=1
+    setup=1641 load=1833 gemv=1864307  gemv/MAC=7.00  FMA-util~14%
+[C] accel B=8 (GEMM,compute-bnd) : 13194581 cyc  speedup=1.60x  bit-exact=1
+    setup=1641 load=12183 gemv=13048648  gemv/MAC=6.12  FMA-util~16%
+    -> memory->compute: gemv/MAC 7.00 (B=1) => 6.12 (B=8)
+[D] accel B=8 || CPU-FIR         : gemv_alone=13048648 gemv_cont=13048948  CONTENTION=300 (0%)
+    acc bit-exact=1  FIR bit-exact=1  FIR slow=1%   <-- policy-sensitive
+[E] DUAL acc0+acc1 B=8           : 6739959 cyc  gemv=6524595  bit-exact=1  imbalance=180
+    gemv 1.99x vs single  |  gemv/MAC 3.06 (single 6.12)
+[F] DUAL B=8 || CPU-FIR (3-way)  : gemv_alone=6524595 gemv_cont=6525782  CONTENTION=1187 (0%)
+    acc bit-exact=1  FIR bit-exact=1  FIR slow=6%
+[acc] batched preds: correct=8/8  match_ref=8/8
+=== ALL bit-exact=1 | B=1 7.00 cyc/MAC -> B=8 6.12 cyc/MAC | dual gemv 1.99x ===

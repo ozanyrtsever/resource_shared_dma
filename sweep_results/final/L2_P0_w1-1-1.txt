@@ -1,0 +1,18 @@
+############################################################
+# L2_P0_w1-1-1   L(lat)=2  policy=0  weights(CPU:ACC0:ACC1)=1:1:1
+# status=ok   Sat Aug 15 11:17:36 AM +03 2026
+############################################################
+=== PERF BENCH  MLP 128-64-32-16  batch B=8  (10752 MAC/img, 86016 MAC/batch) ===
+[A] CPU golden (8 imgs)          : 703127 cyc
+[B] accel B=1 (GEMV,mem-bound)    : 50265 cyc  bit-exact=1
+    setup=1362 load=657 gemv=43549  gemv/MAC=4.05  FMA-util~24%
+[C] accel B=8 (GEMM,compute-bnd) : 302089 cyc  speedup=2.32x  bit-exact=1
+    setup=1362 load=2559 gemv=270275  gemv/MAC=3.14  FMA-util~31%
+    -> memory->compute: gemv/MAC 4.05 (B=1) => 3.14 (B=8)
+[D] accel B=8 || CPU-FIR         : gemv_alone=270275 gemv_cont=272454  CONTENTION=2179 (0%)
+    acc bit-exact=1  FIR bit-exact=1  FIR slow=1%   <-- policy-sensitive
+[E] DUAL acc0+acc1 B=8           : 183914 cyc  gemv=136917  bit-exact=1  imbalance=179
+    gemv 1.97x vs single  |  gemv/MAC 1.59 (single 3.14)
+[F] DUAL B=8 || CPU-FIR (3-way)  : gemv_alone=136917 gemv_cont=139362  CONTENTION=2445 (1%)
+    acc bit-exact=1  FIR bit-exact=1  FIR slow=1%
+=== ALL bit-exact=1 | B=1 4.05 cyc/MAC -> B=8 3.14 cyc/MAC | dual gemv 1.97x ===
