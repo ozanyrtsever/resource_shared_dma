@@ -1002,6 +1002,51 @@ under two accelerators, full round-robin costs it more, and the QoS weights dial
 +13 % to +103 % and the two accelerators' balance (channel imbalance 223 → ~762 k cycles). Every trend
 measured on the toy MLP reproduces on the real network, with a higher headline speedup.
 
+### 11.x A pipelined coprocessor hides the FMA latency with a single unit
+
+The dual-coprocessor result of the previous subsection is best read as a diagnosis rather than a
+destination. The second coprocessor helped *only because the first one was serial*: the accelerator
+issued one multiply-accumulate to the shared FMA and then **waited** the full `1+L` cycles for the
+result before issuing the next, so a single unit's throughput was `cyc/MAC = 1.14 + L` and its FMA-issue
+utilisation fell as `1/(1+L)`. All the second unit did was pour its own MACs into the idle the first
+one left. But that idle is an artefact of the serial issue, not of the sharing — and a batched workload
+already carries, for every streamed weight, **B independent** multiply-accumulates (one per batch lane,
+each into a different accumulator). Issuing those back-to-back keeps a pipelined FMA full from a single
+requestor. The final coprocessor (`dma_fp_dot_accel_pipe`) does exactly this: it **decouples issue from
+collection** — an issue pointer offers one MAC per granted cycle across the B lanes while a collection
+pointer writes each returning result to its lane — and lets up to `L+1` of its own MACs be in flight at
+once. No arbiter change was required: the arbiter already round-trips a two-bit owner tag with each
+result, so the accelerator's in-flight MACs, all of the same op and latency, retire in issue order and a
+simple round-robin collection counter suffices. A one-line hazard interlock (`inflight < B`) stalls
+issue only in the regime `B < L+1`, where the batch is too small to cover the latency; for `B ≥ L+1` it
+never fires. Bit-exactness is untouched by construction: the interleaving is *across* lanes, so each
+dot product still accumulates its terms in order `k = 0..N−1`, identical to the serial unit and to the
+CPU — and at runtime `B = 1` the interlock degenerates the engine back to serial issue, so the two
+designs share one RTL and one correctness argument.
+
+The effect is that the FMA-latency term vanishes from the throughput. Swept over `L = 0..5` (21 configs,
+all bit-exact; LeNet also 8/8 MNIST correct), the pipelined single coprocessor holds `cyc/MAC` **flat at
+1.14 on the toy MLP and 1.12 on LeNet-300-100** — the compute cycles drift by 0.5 % and 0.07 %
+respectively across the entire latency range — where the serial unit grew to `1.14 + L` (up to 6.14).
+Utilisation of the shared FMA stays at ~87 % (toy) / ~88 % (LeNet) at every latency, i.e. within ~13 % of
+the unit's one-MAC-per-cycle ceiling, from a single accelerator. Against the serial single this is up to
+**4.2× (toy) / 5.2× (LeNet) faster at L = 5** with the *same* hardware; against the CPU it holds
+**5.3× (toy) / 8.3× (LeNet) at every latency**, where the serial single had decayed toward parity
+(1.25× / 1.60× at L = 5). Most tellingly, the single pipelined unit **matches or beats the two-coprocessor
+dual for every `L ≥ 1`** — its compute is 2.7× faster than the two serial units at L = 5 — at half the
+coprocessors and half the operand-bus traffic; only at L = 0, where there is no latency to hide, do two
+serial channels edge it by ~10 % on pure compute. Contention with a concurrent CPU FP filter stays
+~3 % (toy) / ~0 % (LeNet), the latter because LeNet's 2.1 M-MAC batch dwarfs the CPU's small job.
+
+This retires the dual as the headline design and sharpens the thesis. The contribution was never a
+second datapath of any kind — it is that one FMA, already present and mostly idle, can be **shared**;
+the pipelined single coprocessor is the clean realisation of that idea, hiding the sharing's only real
+cost (the FMA pipeline latency) without adding a second coprocessor, a second FPU, or any change to the
+CPU-priority arbiter. The two designs are kept side by side (`dma_fp_dot_accel_is` serial baseline,
+`dma_fp_dot_accel_pipe` pipelined) precisely so the latency term can be shown appearing and then
+vanishing; the full tables are in `PIPE_BENCH_REPORT.md` and `PIPE_LENET_REPORT.md`, and the area cost of
+the pipelining logic is measured alongside the serial unit by `dc/run_area.sh`.
+
 ---
 
 ## Appendix A — Reproducibility (current, X-HEEP)

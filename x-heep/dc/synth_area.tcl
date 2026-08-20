@@ -33,6 +33,7 @@ set L      [envd L      ""]
 set POLICY [envd POLICY ""]
 set MAXN   [envd MAXN   ""]
 set MAXB   [envd MAXB   ""]
+set GEMV   [envd GEMV   ""]   ;# 1 -> synthesize the accelerator in lean GEMV mode (GEMV_ONLY=1)
 
 # GUARD: never silently fall back to gtech (which reports area = 0).
 if {![file exists $LIB_DB]} {
@@ -91,6 +92,17 @@ switch $TOP {
         set pl {}
         if {$MAXN ne ""} { lappend pl "MAXN=$MAXN"; append SUF "_N$MAXN" }
         if {$MAXB ne ""} { lappend pl "MAXB=$MAXB"; append SUF "_B$MAXB" }
+        if {$GEMV ne ""} { lappend pl "GEMV_ONLY=$GEMV"; append SUF "_G$GEMV" }
+        set PARAMS [join $pl ", "]
+    }
+    dma_fp_dot_accel_pipe {
+        # PIPELINED accelerator (batched GEMM, pipelined issue). Same black-box buffer convention
+        # as dma_fp_dot_accel_is: dc/rtl_accel_pipe.f OMITS tb/xbuf_ram.sv -> u_xbuf links as a
+        # black box (area 0) -> LOGIC-only area. Buffer reported separately as a 32 KB SRAM macro.
+        set FLIST "dc/rtl_accel_pipe.f"
+        set pl {}
+        if {$MAXN ne ""} { lappend pl "MAXN=$MAXN"; append SUF "_N$MAXN" }
+        if {$MAXB ne ""} { lappend pl "MAXB=$MAXB"; append SUF "_B$MAXB" }
         set PARAMS [join $pl ", "]
     }
     dma_fp_dot_accel {
@@ -103,7 +115,7 @@ switch $TOP {
     }
     default { }
 }
-set RUN "${TOP}${SUF}"
+set RUN [envd RUN_LABEL "${TOP}${SUF}"]   ;# caller can force the report label (e.g. add a clock tag)
 
 # ------------------------------- library ------------------------------------
 set target_library    $LIB_DB

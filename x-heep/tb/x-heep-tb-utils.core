@@ -44,6 +44,7 @@ filesets:
     - dma_fp_dot_accel.sv
     - xbuf_ram.sv
     - dma_fp_dot_accel_is.sv
+    - dma_fp_dot_accel_pipe.sv
     - ext_xbar.sv
     - ext_bus.sv
     file_type: systemVerilogSource

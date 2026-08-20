@@ -21,6 +21,10 @@ core is published; `CHANGES-to-xheep.patch` is the exact diff applied to the ven
   (toy-MLP L×policy sweep), `LENET_SWEEP_REPORT.md` (real LeNet-300-100 L×policy sweep),
   `AREA_REPORT.md` (DC-NXT area study: FPU/FMA L-sweep + 3 arbiter policies + accelerator logic/SRAM),
   `COMPARISON_vs_tanase2026.md` (closest prior art, advantages/gaps).
+- **Pipelined-coprocessor reports** (the CURRENT design): `PIPE_BENCH_REPORT.md` (toy MLP),
+  `PIPE_LENET_REPORT.md` (real LeNet) — a single **pipelined** coprocessor issues the B batch-MACs
+  back-to-back to keep the shared FMA full, holding `cyc/MAC` flat across FMA latency and **superseding
+  the dual design**. `UPDATE_pipelined_coprocessor.md` is the change-log.
 
 ## Key results (all bit-exact vs a CPU/NumPy reference; TSMC 40 nm for area)
 | Result | Number |
@@ -35,6 +39,7 @@ core is published; `CHANGES-to-xheep.patch` is the exact diff applied to the ven
 | **Co-execution (ML ∥ CPU FIR-DSP), shared FMA** | both bit-exact; under contention accel GEMV +14.3 % / CPU +3.9 % (bus, not FMA-starvation); inference hidden in idle FMA cycles → **1.20×** |
 | **Batched GEMM (memory→compute), L=0** | batching flips memory-bound GEMV → compute-bound GEMM: toy MLP **1.14 cyc/MAC, 5.46×**; real **LeNet-300-100: 1.12 cyc/MAC, 88 % FMA-util, 8.34×** (single) — all bit-exact, LeNet **8/8 MNIST correct** |
 | **Two coprocessors on one FMA** (3-requestor arbiter, batched) | dual GEMM **~1.99× vs single at L≥2** (fills the FMA pipeline-wait gaps; 1.12× at L=0 where one accel already saturates the FMA), channels balanced; **LeNet dual 9.06× vs CPU**; the second accelerator's value *grows* with FMA latency — **still no 2nd FPU** |
+| **Pipelined single coprocessor (CURRENT design) — latency hidden by ONE unit** | issuing the B batch-MACs back-to-back keeps the shared FMA full → **`cyc/MAC` flat at 1.14 (toy MLP) / 1.12 (LeNet) across ALL FMA latencies L=0..5** (serial grows to 1.14+L). One pipelined unit is up to **4.2× (toy) / 5.2× (LeNet) faster than the serial single** and **≥ two serial coprocessors for every L≥1** (2.7× at L=5) — at **half the hardware and memory bandwidth**. Holds **5.3× (toy) / 8.3× (LeNet) vs CPU at every latency**; ~88 % FMA-util; LeNet **8/8 MNIST correct**; all bit-exact. **Retires the dual design.** See `PIPE_BENCH_REPORT.md`, `PIPE_LENET_REPORT.md`. |
 | **Arbiter policy / QoS** (compute-bound, 3-way) | CPU-strict keeps the CPU's own job within **≤9 %** under two accelerators at every L; the QoS weights dial the CPU's slow-down **+13 %…+103 %** and the acc0/acc1 balance (imbalance 223 → 762 k) |
 | **Full L×policy sweeps (21 configs each)** | toy MLP + real LeNet, all bit-exact — see `PERF_SWEEP_REPORT.md`, `LENET_SWEEP_REPORT.md`; closest prior art in `COMPARISON_vs_tanase2026.md` |
 
@@ -48,12 +53,13 @@ x-heep/
     dma_apu_arbiter.sv          *** THE contribution: FMA-sharing arbiter — parametric 3-requestor (CPU+acc0+acc1), swappable policy (CPU-strict / all-RR / QoS) ***
     cv32e40px_top.sv            arbiter instantiated + wired between core APU and shared fp_wrapper
   tb/
-    dma_fp_dot_accel_is.sv      *** batched-GEMM coprocessor: runtime N/M/B, input-stationary, weight-reuse (B MACs/weight); input buffer factored into u_xbuf ***
+    dma_fp_dot_accel_pipe.sv    *** CURRENT coprocessor: PIPELINED batched GEMM — issues the B batch-MACs back-to-back, keeps the shared FMA full -> cyc/MAC flat across FMA latency (one unit replaces the dual) ***
+    dma_fp_dot_accel_is.sv      serial batched-GEMM coprocessor (baseline): runtime N/M/B, input-stationary, weight-reuse (B MACs/weight); input buffer factored into u_xbuf
     xbuf_ram.sv                 the input buffer as a 1R1W submodule (an SRAM macro in silicon; black-boxed to report logic-only area)
     dma_fp_dot_accel.sv         earlier pair-streaming dot-product coprocessor
     dma_sum_accel.sv            FP-free integer-sum accelerator (Y1 bring-up)
     tb_top.cpp                  Verilator TB; FST tracing guarded by `#if VM_TRACE` -> trace-off builds run fast (needed for the large LeNet sweep)
-    testharness.sv.tpl          two coprocessors on DMA ch1/ch2 hw_fifo + arbiter APU ports (behind `COPROC_FPU_SHARE`)
+    testharness.sv.tpl          coprocessors on DMA ch1/ch2 hw_fifo + arbiter APU ports (behind `COPROC_FPU_SHARE`); `COPROC_PIPE` knob selects the pipelined vs serial coprocessor (acc1 kept idle for the single-coprocessor runs)
   hw/core-v-mini-mcu/*.tpl      APU-port threading through the SoC hierarchy
   configs/cv32e40px_fpu_dma.hjson   cv32e40px+FPU, DMA hw_fifo, SRAM enlarged to 2 MB
   core-v-mini-mcu.core          `+define+COPROC_FPU_SHARE` master toggle (single-define clean revert)
@@ -64,6 +70,8 @@ x-heep/
     ml_lenet/       full LeNet-300-100 forward (2D single-transfer) + cycle-budget decomposition (4.80×)
     perf_bench/     *** batched end-to-end benchmark on a toy MLP: single/contention/DUAL/3-way, memory->compute, all bit-exact ***
     perf_lenet/     *** the same benchmark on the REAL LeNet-300-100/MNIST (batched, 2D weights): single 8.34x, dual 9.06x, 8/8 correct ***
+    perf_bench_pipe/  *** CURRENT: single PIPELINED coprocessor on the toy MLP — cyc/MAC flat 1.14 across L, up to 4.2x vs serial, no dual ***
+    perf_lenet_pipe/  *** CURRENT: single PIPELINED coprocessor on REAL LeNet — cyc/MAC flat 1.12, 8.3x vs CPU at every L, 8/8 correct ***
     ml_coexec/      *** co-execution: accel ML || CPU FIR, 2D + accel/CPU contention decomposition ***
     ml_dual/        dual-stream: CPU classifies one digit while accel classifies another
     ml_rt_gemv/     runtime-N/M bring-up

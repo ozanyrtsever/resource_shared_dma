@@ -434,9 +434,32 @@ module testharness #(
       
   );
 
+  `ifndef COPROC_SERIAL
+    `define COPROC_PIPE
+  `endif
+
     `ifdef COPROC_FPU_SHARE
     // Y2: FP dot-product accelerator on DMA HW-FIFO channel 1, sharing the CPU's FMA
-  dma_fp_dot_accel_is #(.MAXN(1024)) dma_fp_dot_accel_i (
+  
+  `ifdef COPROC_PIPE
+    dma_fp_dot_accel_pipe #(.MAXN(1024), .MAXB(8)) dma_fp_dot_accel_i (
+      .clk_i         (clk_i),
+      .rst_ni        (rst_ni),
+      .hw_fifo_req_i (hw_fifo_req[1]),
+      .hw_fifo_resp_o(hw_fifo_resp[1]),
+      .done_o        (accel_done),
+      .fpu_req_o     (accel_apu_req),
+      .fpu_gnt_i     (accel_apu_gnt),
+      .fpu_operands_o(accel_apu_operands),
+      .fpu_op_o      (accel_apu_op),
+      .fpu_flags_o   (accel_apu_flags),
+      .fpu_rvalid_i  (accel_apu_rvalid),
+      .fpu_rdata_i   (accel_apu_rdata),
+      .fpu_rflags_i  (accel_apu_rflags)
+  );
+  `else
+  
+  dma_fp_dot_accel_is   #(.MAXN(1024), .MAXB(8)) dma_fp_dot_accel_i (
       .clk_i         (clk_i),
       .rst_ni        (rst_ni),
       .hw_fifo_req_i (hw_fifo_req[1]),
@@ -452,8 +475,11 @@ module testharness #(
       .fpu_rflags_i  (accel_apu_rflags)
   );
 
+  `endif
+
+
     // acc1: second FP dot-product accelerator on DMA HW-FIFO channel 2, sharing the SAME FMA
-  dma_fp_dot_accel_is #(.MAXN(1024)) dma_fp_dot_accel1_i (
+  dma_fp_dot_accel_is #(.MAXN(1024), .MAXB(8)) dma_fp_dot_accel1_i (   // acc1: idle for single-coprocessor runs (dual gelecek)
       .clk_i         (clk_i),
       .rst_ni        (rst_ni),
       .hw_fifo_req_i (hw_fifo_req[2]),

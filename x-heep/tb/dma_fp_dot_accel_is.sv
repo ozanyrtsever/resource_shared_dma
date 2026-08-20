@@ -23,8 +23,8 @@
 module dma_fp_dot_accel_is
   import fifo_pkg::*;                         // fifo_req_t / fifo_resp_t (DMA hardware-FIFO handshake)
 #(
-    parameter int unsigned MAXN = 1024,     // max dot length N the input buffer can hold (LeNet N=784 <= 1024)
-    parameter int unsigned MAXB = 8         // max batch size B (MAXB=1 -> pure GEMV, no batching)
+    parameter int unsigned MAXN = 1024,     // max dot length (>=640)
+    parameter int unsigned MAXB = 8        // max batch size B (GEMM mode)
 )(
     input  logic        clk_i, rst_ni,       // clock + asynchronous active-low reset
     // ---- DMA hardware-FIFO side (data in / results out) ----
@@ -41,8 +41,12 @@ module dma_fp_dot_accel_is
     input  logic [31:0]       fpu_rdata_i,     // FMA result data (the MAC output)
     input  logic [4:0]        fpu_rflags_i     // FMA status flags (unused here)
 );
-  localparam int unsigned IW = $clog2(MAXN);                 // width of the element index (buffer address)
-  localparam int unsigned BW = (MAXB>1) ? $clog2(MAXB) : 1;  // width of the batch index (>=1 even for MAXB=1)
+  localparam int unsigned IW = $clog2(MAXN);
+  // Effective batch dimension: GEMV_ONLY collapses it to 1 at ELABORATION -> the accumulator array,
+  // the batch counters and the loop bounds all fold away (lean GEMV). GEMM keeps the full MAXB.
+  localparam int unsigned NB = MAXB;
+  localparam int unsigned BW = (NB>1) ? $clog2(NB) : 1;
+
 
   // FSM states: load the header, load the inputs, then per weight do B MACs, then emit B results.
   typedef enum logic [3:0] { LHDR_N, LHDR_M, LHDR_B, LDAT, RECV, REQ, WAIT, OUT, DONE } state_e;
@@ -50,7 +54,7 @@ module dma_fp_dot_accel_is
 
   // ---- internal state (registers) ----
   logic [31:0] x_rd;                    // input value read COMBINATIONALLY from the buffer (u_xbuf output)
-  logic [31:0] acc_q [MAXB];            // B partial sums, one accumulator per batch lane  <-- the 256 FFs
+  logic [31:0] acc_q [NB];
   logic [31:0] w_q;                     // the weight currently being streamed / reused across the B lanes
   logic [15:0] n_q, m_q, bn_q;          // runtime dot-length N / row-count M / batch-count B (from header)
   logic [15:0] i_q, r_q;                // i_q = element index (0..N-1), r_q = output-row index (0..M-1)
@@ -73,17 +77,19 @@ module dma_fp_dot_accel_is
                             empty:(state_q!=OUT),                  // results are readable ONLY in OUT
                             data:acc_q[out_b[BW-1:0]] };           // the result being emitted (lane out_b)
   assign done_o = (state_q == DONE);    // transfer finished
+  // batch count for the loop bounds: compile-time 1 in GEMV mode (folds the counters), else runtime B
+  wire [15:0] BEFF = bn_q;
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
       // ---- reset: back to header, clear all counters + the B accumulators ----
       state_q<=LHDR_N; w_q<='0; n_q<='0; m_q<='0; bn_q<='0; i_q<='0; r_q<='0;
       ld_b<='0; ex_b<='0; out_b<='0; loaded_q<=1'b0;
-      for (int k=0;k<MAXB;k++) acc_q[k]<='0;
+      for (int k=0;k<NB;k++) acc_q[k]<='0;
       // x_buf (u_xbuf) is NOT reset: every location is written during LDAT before it is ever read
     end else if (hw_fifo_req_i.flush) begin
       // ---- flush between the two DMA transfers: keep the buffered inputs + N/M/B, restart compute ----
-      for (int k=0;k<MAXB;k++) acc_q[k]<='0;
+      for (int k=0;k<NB;k++) acc_q[k]<='0;
       i_q<='0; r_q<='0; ex_b<='0; out_b<='0; ld_b<='0;   // x_buf + n_q + m_q + bn_q KEPT
       state_q <= loaded_q ? RECV : LHDR_N;   // if inputs already loaded -> jump straight to compute (RECV)
     end else begin
@@ -97,7 +103,7 @@ module dma_fp_dot_accel_is
         LDAT: if (hw_fifo_req_i.push) begin
           if (i_q+1==n_q) begin                 // finished one input vector (N elements)
             i_q<='0;
-            if (ld_b+1==bn_q) begin loaded_q<=1'b1; state_q<=DONE; end  // all B inputs loaded -> end LOAD xfer
+            if (ld_b+1==BEFF) begin loaded_q<=1'b1; state_q<=DONE; end  // all B inputs loaded -> end LOAD xfer
             else ld_b<=ld_b+1'b1;               // move to the next input vector
           end else i_q<=i_q+1'b1;               // next element of the current input vector
         end
@@ -109,7 +115,7 @@ module dma_fp_dot_accel_is
         REQ:  if (fpu_gnt_i) begin               // arbiter granted the FMA
           if (fpu_rvalid_i) begin                // result came back same cycle (L=0 / already pipelined)
             acc_q[ex_b[BW-1:0]]<=fpu_rdata_i;    // write the MAC result into lane ex_b
-            if (ex_b+1==bn_q) begin              // done all B lanes for THIS weight
+            if (ex_b+1==BEFF) begin              // done all B lanes for THIS weight
               if (i_q+1==n_q) begin i_q<='0; out_b<='0; state_q<=OUT; end  // row complete -> emit results
               else begin i_q<=i_q+1'b1; state_q<=RECV; end                 // else fetch the next weight
             end else begin ex_b<=ex_b+1'b1; state_q<=REQ; end   // next batch lane, SAME weight (reuse!)
@@ -119,7 +125,7 @@ module dma_fp_dot_accel_is
         // ---- WAIT: FMA was granted but result is still in the pipeline; wait for rvalid ----
         WAIT: if (fpu_rvalid_i) begin            // (this serial wait is why cyc/MAC ~= 2+L for one accel)
           acc_q[ex_b[BW-1:0]]<=fpu_rdata_i;
-          if (ex_b+1==bn_q) begin
+          if (ex_b+1==BEFF) begin
             if (i_q+1==n_q) begin i_q<='0; out_b<='0; state_q<=OUT; end
             else begin i_q<=i_q+1'b1; state_q<=RECV; end
           end else begin ex_b<=ex_b+1'b1; state_q<=REQ; end
@@ -127,10 +133,10 @@ module dma_fp_dot_accel_is
 
         // ---- OUT: emit the B results of the finished row (DMA pops acc_q[out_b]) ----
         OUT: if (hw_fifo_req_i.pop) begin
-          if (out_b+1==bn_q) begin                 // all B results of this row emitted
+          if (out_b+1==BEFF) begin                 // all B results of this row emitted
             if (r_q+1==m_q) begin loaded_q<=1'b0; state_q<=DONE; end   // last row -> whole GEMM done
             else begin
-              for (int k=0;k<MAXB;k++) acc_q[k]<='0;   // clear the accumulators for the next row
+              for (int k=0;k<NB;k++) acc_q[k]<='0;   // clear the accumulators for the next row
               r_q<=r_q+1'b1; out_b<='0; state_q<=RECV; // next row: go receive its first weight
             end
           end else out_b<=out_b+1'b1;              // emit the next batch lane's result
@@ -146,7 +152,7 @@ module dma_fp_dot_accel_is
   //      (dc/rtl_accel_is.f omits xbuf_ram.sv -> u_xbuf links as a black box -> logic-only area).
   // write-enable is EXACTLY when the old inline x_buf wrote: not reset, not flush, in LDAT, on a push.
   wire xbuf_we = rst_ni && !hw_fifo_req_i.flush && (state_q==LDAT) && hw_fifo_req_i.push;
-  xbuf_ram #(.MAXB(MAXB), .MAXN(MAXN), .BW(BW), .IW(IW)) u_xbuf (
+  xbuf_ram #(.MAXB(NB), .MAXN(MAXN), .BW(BW), .IW(IW)) u_xbuf (
     .clk_i (clk_i),
     .we_i  (xbuf_we),                    // write pulse (LOAD phase)
     .wb_i  (ld_b[BW-1:0]),               // write batch index  (which input vector)

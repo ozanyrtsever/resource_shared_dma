@@ -43,12 +43,14 @@ done
 for P in 0 1 2; do
     runone "dma_apu_arbiter_P$P"       TOP=dma_apu_arbiter       POLICY="$P"
 done
-# (d) accelerator, LOGIC only (x_buf black-boxed as a 32 KB SRAM macro)
+# (d) accelerators, LOGIC only (x_buf black-boxed as a 32 KB SRAM macro): serial + pipelined
 runone "dma_fp_dot_accel_is"           TOP=dma_fp_dot_accel_is
+runone "dma_fp_dot_accel_pipe"         TOP=dma_fp_dot_accel_pipe
 
 # ================================ SUMMARY ==================================
 # Total cell area from a flat area report.
 area_of() { grep -i "Total cell area" "dc/reports/area_$1.rpt" 2>/dev/null | tail -1 | awk '{print $NF}'; }
+ge()      { awk -v a="${1:-}" 'BEGIN{ if(a=="") print "?"; else printf "%.0f", a/0.9576 }'; }  # 1 GE = 0.9576 um^2 (NAND2_X1M_A12TR40)
 # FMA-alone (fpnew_fma_multi) absolute area from the fp_wrapper hierarchy report at latency L.
 fma_of()  { awk '/fpnew_fma_multi/ && $1 ~ /^[0-9]/ {print $1; exit}' \
               "dc/reports/area_cv32e40px_fp_wrapper_L$1_hier.rpt" 2>/dev/null; }
@@ -77,11 +79,16 @@ printf "%-26s %18s\n" "P1  all round-robin"    "$(area_of dma_apu_arbiter_P1)"
 printf "%-26s %18s\n" "P2  QoS weighted 4:2:1" "$(area_of dma_apu_arbiter_P2)"
 
 echo
-echo "--- (d) Accelerator (dma_fp_dot_accel_is), LOGIC only (buffer excluded) ---"
-printf "%-26s %18s\n" "accel logic" "$(area_of dma_fp_dot_accel_is)"
+echo "--- (d) Accelerators, LOGIC only (buffer excluded) ---"
+printf "%-32s %16s %12s\n" "design" "area (um^2)" "area (GE)"
+IS=$(area_of dma_fp_dot_accel_is);  PIPE=$(area_of dma_fp_dot_accel_pipe)
+printf "%-32s %16s %12s\n" "serial (dma_fp_dot_accel_is)"   "${IS:-?}"   "$(ge "${IS:-}")"
+printf "%-32s %16s %12s\n" "pipe   (dma_fp_dot_accel_pipe)" "${PIPE:-?}" "$(ge "${PIPE:-}")"
+if [ -n "${IS:-}" ] && [ -n "${PIPE:-}" ]; then
+    awk -v a="$IS" -v b="$PIPE" 'BEGIN{printf "   pipelining cost = %+.2f um^2 (%+.0f GE, %+.1f%%) vs serial\n", b-a, (b-a)/0.9576, 100*(b-a)/a}'
+fi
 echo "   input buffer x_buf = MAXB*MAXN*32b = 8*1024*32 = 262144 b = 32 KB single-port SRAM /accel"
-echo "   two accelerators on the SoC -> 64 KB SRAM total. Get the macro area from the memory compiler"
-echo "   (40nm 6T rough estimate ~0.11 mm^2 for 32 KB). Never counted as flip-flops."
+echo "   (40nm 6T rough estimate ~0.11 mm^2 for 32 KB). Never counted as flip-flops.  1 GE = 0.9576 um^2."
 
 echo
 echo "--- 'no second FPU' comparison ---"
