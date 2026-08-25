@@ -3,16 +3,15 @@
 # Skips any config already done (output has "ALL bit-exact=1"), so re-running only fills the gaps.
 # IMPORTANT: disable tracing in core-v-mini-mcu.core (comment the --trace* lines) for reasonable speed.
 #
-# ONE script, two benchmarks -- pick via env vars (defaults keep the perf_bench behavior):
-#   perf_bench (toy MLP):  nohup ./sweep.sh > sweep_nohup.log 2>&1 &
-#   LeNet-300-100       :  PROJECT=perf_lenet OUTDIR=sweep_results/lenet RUN_TIMEOUT=14400 \
-#                          nohup ./sweep.sh > sweep_lenet_nohup.log 2>&1 &
-# (LeNet is ~25x the MACs -> each config ~1.5-3 h; raise RUN_TIMEOUT and trim CONFIGS if needed.)
+# ONE script, iki benchmark -- env ile sec (default = pipe toy MLP). tmux icinde kos (kopmaya karsi).
+#   perf_bench_pipe (toy MLP):  ./sweep.sh
+#   perf_lenet_pipe (LeNet)  :  PROJECT=perf_lenet_pipe OUTDIR=sweep_results/lenet_pipe RUN_TIMEOUT=14400 ./sweep.sh
+# (LeNet ~20x MAC -> her config daha uzun; RUN_TIMEOUT'u buyut.)  Config listesi asagida AYNEN korunur.
 
 cd /home/ozan/thesis/resource_shared_dma/x-heep || { echo "wrong dir"; exit 1; }
 export MAKEFLAGS="-j$(nproc)"                       # parallel Verilator C++ compile -> ~5x faster build
-PROJECT="${PROJECT:-perf_bench}"                    # app to build/run (perf_bench | perf_lenet)
-OUTDIR="${OUTDIR:-sweep_results/final}"            # override for a separate folder -> no collision
+PROJECT="${PROJECT:-perf_bench_pipe}"               # app (perf_bench_pipe | perf_lenet_pipe)
+OUTDIR="${OUTDIR:-sweep_results/bench_pipe}"        # ayri klasor -> cakismasin
 RUN_TIMEOUT="${RUN_TIMEOUT:-3600}"                 # per-config sim timeout (s); LeNet needs more
 mkdir -p "$OUTDIR"
 SUMMARY="$OUTDIR/00_summary.csv"
@@ -26,11 +25,11 @@ UART=build/openhwgroup.org_systems_core-v-mini-mcu_1.0.5/sim-verilator/uart0.log
 # "L POLICY W_CPU W_ACC0 W_ACC1"   (weights used only by policy 2)
 CONFIGS=(
   "0 0 1 1 1" "0 1 1 1 1" "0 2 1 1 1" "0 2 4 1 1" "0 2 1 4 4" "0 2 1 4 1"   # L=0 (+QoS weights)
-  "1 0 1 1 1" "1 1 1 1 1" "1 2 4 2 1"
-  "2 0 1 1 1" "2 1 1 1 1" "2 2 4 2 1"
-  "3 0 1 1 1" "3 1 1 1 1" "3 2 4 2 1"
-  "4 0 1 1 1" "4 1 1 1 1" "4 2 4 2 1"
-  "5 0 1 1 1" "5 1 1 1 1" "5 2 4 2 1"
+  "1 0 1 1 1" "1 1 1 1 1" "1 2 4 1 1"
+  "2 0 1 1 1" "2 1 1 1 1" "2 2 4 1 1"
+  "3 0 1 1 1" "3 1 1 1 1" "3 2 4 1 1"
+  "4 0 1 1 1" "4 1 1 1 1" "4 2 4 1 1"
+  "5 0 1 1 1" "5 1 1 1 1" "5 2 4 1 1"
 )
 
 log(){ echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }

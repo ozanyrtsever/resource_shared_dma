@@ -266,7 +266,7 @@ module cv32e40px_top
       logic fma_active;
 
       `ifndef ARB_POLICY_SEL
-            `define ARB_POLICY_SEL 1
+            `define ARB_POLICY_SEL 0
       `endif
       `ifndef ARB_W_CPU
             `define ARB_W_CPU 4

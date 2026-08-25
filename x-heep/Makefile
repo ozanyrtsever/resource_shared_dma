@@ -159,7 +159,6 @@ mcu-gen:
 	@echo "### MCU-GEN completed! Running FuseSoC register generators..."	
 	$(FUSESOC) --cores-root $(FUSESOC_CORES_ROOT) run --target=sim --tool=verilator $(FUSESOC_FLAGS) --setup openhwgroup.org:systems:core-v-mini-mcu
 
-	$(MAKE) verible
 	$(MAKE) format-python
 
 ## Display mcu_gen.py help

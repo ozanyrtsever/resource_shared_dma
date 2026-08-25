@@ -102,8 +102,10 @@ module dma_apu_arbiter
     // -------- P2: QoS weighted round-robin (deficit credits; grant share ~ weights) --------
     else begin : g_policy
       localparam logic signed [9:0] WV [3] = '{10'(W_CPU), 10'(W_ACC0), 10'(W_ACC1)};
-      localparam logic signed [9:0] WTOT   = 10'(W_CPU + W_ACC0 + W_ACC1);
       logic signed [9:0] cred_q [3];
+      logic signed [9:0] wsum;   // sum of the REQUESTING requestors' weights -> drift-free quantum
+      always_comb wsum = (req[0] ? WV[0] : 10'sd0) + (req[1] ? WV[1] : 10'sd0) + (req[2] ? WV[2] : 10'sd0);
+
       always_comb begin
         logic signed [9:0] best; logic [1:0] bi; logic found;
         best = '0; bi = 2'd0; found = 1'b0;
@@ -120,7 +122,7 @@ module dma_apu_arbiter
         if (!rst_ni) for (int i = 0; i < 3; i++) cred_q[i] <= '0;
         else if (fpu_req_o & fpu_gnt_i) begin
           for (int i = 0; i < 3; i++) begin
-            if      (grant[i]) cred_q[i] <= cred_q[i] + WV[i] - WTOT;
+            if      (grant[i]) cred_q[i] <= cred_q[i] + WV[i] - wsum;
             else if (req[i])   cred_q[i] <= cred_q[i] + WV[i];
           end
         end
