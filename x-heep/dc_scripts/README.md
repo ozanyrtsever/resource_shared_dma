@@ -30,7 +30,7 @@ Each of these tops has **all ports at the top level**, so DC keeps every gate
 #    TOP = dma_apu_arbiter        -> dc/reports/area_dma_apu_arbiter.rpt
 # 3) the accelerator FSM we ADD:
 #    TOP = dma_fp_dot_accel       -> dc/reports/area_dma_fp_dot_accel.rpt
-dc_shell -f dc/synth_area.tcl | tee dc/reports/log_<TOP>.txt
+dcnxt_shell -f dc/synth_area.tcl | tee dc/reports/log_<TOP>.txt
 grep -i "Total cell area" dc/reports/area_<TOP>.rpt
 ```
 

@@ -1,8 +1,8 @@
 #=============================================================================
 # Area synthesis of ONE module for the shared-FMA thesis (Design Compiler).
 #
-# Driven per-run by dc/run_area.sh (a FRESH dcnxt_shell each -> zero state mixing).
-# To run one module by hand:  TOP=dma_apu_arbiter dcnxt_shell -f dc/synth_area.tcl
+# Driven per-run by dc_scripts/run_area.sh (a FRESH dcnxt_shell each -> zero state mixing).
+# To run one module by hand:  TOP=dma_apu_arbiter dcnxt_shell -f dc_scripts/synth_area.tcl
 #
 # Environment inputs:
 #   TOP      module to synthesize (default cv32e40px_fp_wrapper)
@@ -13,14 +13,18 @@
 #   POLICY   arbiter policy for dma_apu_arbiter -> parameter ARB_POLICY (0/1/2)
 #   MAXN,MAXB  accelerator buffer dims for dma_fp_dot_accel_is
 #
-# Output reports go to dc/reports/area_<RUN>.rpt (+ _hier/refs/timing), where
+# Output reports go to dc_reports/area_<RUN>.rpt (+ _hier/refs/timing), where
 #   <RUN> = <TOP> + suffix (_L#, _P#, _N#, _B#) so sweeps never overwrite each other.
 #
 # Edit LIB_DB below ONCE on the machine that runs Design Compiler.
 #=============================================================================
 
 # ----------------------------- USER SETTING ---------------------------------
-set LIB_DB "./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db"
+# .db yolu: env LIB_DB > dc_scripts/ > dc/ (asagidaki GUARD bulunamazsa durdurur)
+if {[info exists ::env(LIB_DB)]} { set LIB_DB $::env(LIB_DB) } else {
+  set LIB_DB "./dc_scripts/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db"
+  if {![file exists $LIB_DB]} { set LIB_DB "./dc/sc12mc_cln40g_base_rvt_c40_ss_typical_max_0p81v_125c.db" }
+}
 # ----------------------------------------------------------------------------
 
 set XHEEP [pwd]
@@ -38,12 +42,12 @@ set GEMV   [envd GEMV   ""]   ;# 1 -> synthesize the accelerator in lean GEMV mo
 # GUARD: never silently fall back to gtech (which reports area = 0).
 if {![file exists $LIB_DB]} {
     puts "FATAL: standard-cell library not found: $LIB_DB"
-    puts "       Edit LIB_DB at the top of dc/synth_area.tcl to point at the .db on THIS server."
+    puts "       Edit LIB_DB at the top of dc_scripts/synth_area.tcl to point at the .db on THIS server."
     exit 1
 }
 
 # ---- per-TOP: filelist, analyze defines, elaborate params, run-id suffix ----
-set FLIST   "dc/rtl_core.f"
+set FLIST   "dc_scripts/rtl_core.f"
 set DEFINES {SYNTHESIS}
 set PARAMS  ""
 set SUF     ""
@@ -83,12 +87,12 @@ switch $TOP {
         }
     }
     dma_fp_dot_accel_is {
-        # CURRENT accelerator (batched GEMM). dc/rtl_accel_is.f OMITS tb/xbuf_ram.sv on
+        # CURRENT accelerator (batched GEMM). dc_scripts/rtl_accel_is.f OMITS tb/xbuf_ram.sv on
         # purpose, so the u_xbuf input buffer links as a BLACK BOX (area 0): the reported
         # area is the accelerator's LOGIC only. The buffer itself is a 32 KB SRAM macro,
         # reported separately (memory compiler / estimate) -- never as flip-flops.
         # ("unresolved reference xbuf_ram" warnings during link are EXPECTED, not errors.)
-        set FLIST "dc/rtl_accel_is.f"
+        set FLIST "dc_scripts/rtl_accel_is.f"
         set pl {}
         if {$MAXN ne ""} { lappend pl "MAXN=$MAXN"; append SUF "_N$MAXN" }
         if {$MAXB ne ""} { lappend pl "MAXB=$MAXB"; append SUF "_B$MAXB" }
@@ -97,9 +101,9 @@ switch $TOP {
     }
     dma_fp_dot_accel_pipe {
         # PIPELINED accelerator (batched GEMM, pipelined issue). Same black-box buffer convention
-        # as dma_fp_dot_accel_is: dc/rtl_accel_pipe.f OMITS tb/xbuf_ram.sv -> u_xbuf links as a
+        # as dma_fp_dot_accel_is: dc_scripts/rtl_accel_pipe.f OMITS tb/xbuf_ram.sv -> u_xbuf links as a
         # black box (area 0) -> LOGIC-only area. Buffer reported separately as a 32 KB SRAM macro.
-        set FLIST "dc/rtl_accel_pipe.f"
+        set FLIST "dc_scripts/rtl_accel_pipe.f"
         set pl {}
         if {$MAXN ne ""} { lappend pl "MAXN=$MAXN"; append SUF "_N$MAXN" }
         if {$MAXB ne ""} { lappend pl "MAXB=$MAXB"; append SUF "_B$MAXB" }
@@ -107,7 +111,7 @@ switch $TOP {
     }
     dma_fp_dot_accel {
         # OLD buffer-less accelerator (kept for reference).
-        set FLIST "dc/rtl_accel.f"
+        set FLIST "dc_scripts/rtl_accel.f"
     }
     cv32e40px_top {
         set DEFINES {SYNTHESIS COPROC_FPU_SHARE}
@@ -121,11 +125,11 @@ set RUN [envd RUN_LABEL "${TOP}${SUF}"]   ;# caller can force the report label (
 set target_library    $LIB_DB
 set synthetic_library "dw_foundation.sldb"
 set link_library      [concat "*" $LIB_DB $synthetic_library]
-define_design_lib WORK -path ./dc/work/$RUN          ;# per-RUN work dir -> no clash across sweep
+define_design_lib WORK -path ./dc_work/$RUN          ;# per-RUN work dir -> no clash across sweep
 set search_path [concat $search_path \
     $XHEEP/hw/vendor/pulp_platform/common_cells/include \
     $XHEEP/hw/vendor/pulp_platform/register_interface/include ]
-file mkdir dc/reports
+file mkdir dc_reports
 
 # ------------------------------ read RTL ------------------------------------
 set fh [open $XHEEP/$FLIST r]
@@ -154,16 +158,16 @@ compile_ultra
 compile_ultra -incremental
 
 # ------------------------------- reports ------------------------------------
-report_area -hierarchy > dc/reports/area_${RUN}_hier.rpt
-report_area            > dc/reports/area_${RUN}.rpt
-report_reference       > dc/reports/refs_${RUN}.rpt
-report_timing          > dc/reports/timing_${RUN}.rpt
+report_area -hierarchy > dc_reports/area_${RUN}_hier.rpt
+report_area            > dc_reports/area_${RUN}.rpt
+report_reference       > dc_reports/refs_${RUN}.rpt
+report_timing          > dc_reports/timing_${RUN}.rpt
 
 # Robust area read: parse the report just written. (The design 'area' attribute name/query
 # varies across DC versions -- get_attribute [current_design] area warns on some -- but
 # "Total cell area:" in the report is stable.)
 set A ""
-if {[catch {open dc/reports/area_${RUN}.rpt r} fa] == 0} {
+if {[catch {open dc_reports/area_${RUN}.rpt r} fa] == 0} {
     foreach ln [split [read $fa] "\n"] {
         if {[regexp {Total cell area:\s*([0-9.]+)} $ln -> m]} { set A $m }
     }

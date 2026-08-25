@@ -2,38 +2,47 @@
 
 **Master's Thesis — Design and Implementation Progress Report**
 
-*Last updated: 2026-07 (after Phase Y1 — on-SoC hardware-FIFO accelerator tap verified).*
+*Last updated: 2026-08 — final design complete. The coprocessor is a **pipelined single unit** that
+time-shares the CPU's one FMA through a no-drain, owner-tagged, CPU-priority APU arbiter; performance,
+area, and Fmax are measured. Earlier variants (the interleaved-pair dot product, the serial GEMV, the
+dual coprocessor) are retained only as design-evolution history (§5, §11).*
 
 ---
 
 ## Abstract
 
-This work presents the design and implementation of a memory-mapped, descriptor-programmed
-**Direct Memory Access (DMA) dot-product coprocessor** for the OpenHW **CV32E40P** RISC-V core,
-integrated into the EPFL **X-HEEP** microcontroller platform. The distinguishing feature of the
-design is that the coprocessor does **not** instantiate its own floating-point arithmetic. Instead,
-it is intended to **time-share the CPU's single existing fused-multiply-add (FMA) unit** inside the
-FPnew (CVFPU) floating-point unit, accessing it through the same Auxiliary Processing Unit (APU)
-interface that the core itself uses. A CPU-priority arbitration scheme (stall / drain / resume) will
-guarantee that the processor's own floating-point instructions are never starved, while the
-coprocessor opportunistically streams dot-product operands through the FMA when it is idle. Because
-no second floating-point datapath is added, the coprocessor is expected to deliver
-data-movement-overlapped reduction throughput at a fraction of the area cost of a conventional
-floating-point accelerator — this area/throughput trade-off is the quantitative claim of the thesis.
+This work presents the design, implementation, and evaluation of a memory-mapped, DMA-programmed
+**reduction coprocessor** for the OpenHW **CV32E40P** RISC-V core, integrated into the EPFL **X-HEEP**
+microcontroller. Its distinguishing feature is that the coprocessor instantiates **no floating-point
+arithmetic of its own**: every multiply-accumulate is issued to the **CPU's single existing
+fused-multiply-add (FMA)** inside the FPnew (CVFPU) unit, over the same Auxiliary Processing Unit (APU)
+port the core itself uses. A small **CPU-priority arbiter**, inserted at the core's APU boundary,
+time-multiplexes the FMA between the CPU and the coprocessor; it round-trips a 2-bit **owner tag** with
+each in-flight operation so results route back correctly even when they retire out of order, which lets
+it grant every cycle **without a drain** and never starve the CPU's own floating-point work. Because no
+second floating-point datapath is added, the design delivers data-movement-overlapped reduction
+throughput at the cost of a small arbiter rather than a whole FMA — the area/throughput trade-off that
+is the quantitative claim of the thesis.
 
-This document reports the work completed to date across two parts. **Part I (standalone feasibility,
-Phases X0–X2)** brought up the DMA substrate and its hardware-FIFO accelerator interface in
-isolation, and demonstrated a floating-point dot-product accelerator driving the *real* CV32E40P
-floating-point wrapper to a correct result. **Part II (on-SoC integration, Phases Y0–Y1)** moved the
-work into the full X-HEEP system-on-chip: a complete FPU-enabled microcontroller was generated and
-simulated on Verilator, establishing that the floating-point core, the DMA, and the interconnect all
-elaborate and execute correctly together, and yielding a **CPU-only dot-product baseline of 303
-cycles** for a 32-element single-precision reduction; and a floating-point-free reduction
-accelerator was attached to the DMA's hardware-FIFO port and driven from C, proving the
-accelerator-injection datapath **on the real SoC**. The remaining phases — the floating-point
-sharing arbiter that constitutes the central contribution (Phase Y2), and the area/throughput
-measurement study (Phase Y3) — are specified and scheduled. Throughout, the boundary between
-completed and planned work is stated explicitly.
+A single design subtlety shapes the final architecture. A pipelined FMA has latency *L*; a coprocessor
+that issues one MAC and then waits for its result exposes that latency in full (`cyc/MAC = 1.14 + L`).
+But a **batched** matrix product carries, per streamed weight, *B* **independent** multiply-accumulates
+— one per batch lane — and issuing those back-to-back keeps the pipelined FMA full from a single
+requestor. The final coprocessor (`dma_fp_dot_accel_pipe`) does exactly this, decoupling issue from
+result-collection so up to *L*+1 of its MACs are in flight at once; its per-MAC cost is therefore
+**independent of the FMA latency** (flat ≈ 1.12–1.14 cyc/MAC across *L* = 0..5), and **one** pipelined
+unit saturates the FMA — retiring an earlier dual-coprocessor variant. On the X-HEEP SoC (Verilator),
+the design runs a toy MLP at **5.45×** and real **LeNet-300-100 / MNIST** at **8.37×** over the CPU,
+**bit-exact** with the CPU (it uses the CPU's own FMA) at **8/8** MNIST accuracy; a CPU floating-point
+DSP kernel can run **concurrently** on the shared FMA at negligible cost. Synthesized in TSMC 40 nm at
+its **260 MHz** operating point (Synopsys DC-NXT), the sharing mechanism costs a **1.8 k µm² arbiter —
+8.4 % of one FMA, 2.0 % of the core** — i.e. per accelerator **3.9× less added area** than giving it a
+dedicated FMA. The report documents the full path to this result across three parts. **Part I
+(standalone feasibility, X0–X2)** brought up the DMA substrate and drove a dot product on the *real*
+FPnew FMA; **Part II (on-SoC, Y0–Y1)** built a full FPU+DMA X-HEEP MCU — establishing a **303-cycle**
+CPU dot-product baseline — and proved the accelerator tap from C; **Part III (Y2–Y3)** built the
+CPU-priority sharing arbiter and the pipelined coprocessor and measured performance, area, and Fmax.
+Throughout, the boundary between the design's evolution and its final form is stated explicitly.
 
 ---
 
@@ -64,28 +73,39 @@ The central observation of this thesis is that, during data-movement-bound reduc
 CPU's own floating-point unit is **largely idle** — the core spends its time issuing loads and
 managing the loop, not executing back-to-back FMAs. This thesis exploits that idle time:
 
-> A descriptor-programmed DMA coprocessor streams operand pairs from memory and feeds them into the
-> **CPU's existing FMA** through the APU port, accumulating a dot product, while a CPU-priority
-> arbiter ensures the processor reclaims the FMA immediately whenever it issues its own
-> floating-point instruction.
+> A DMA-programmed coprocessor streams operands from memory and feeds every multiply-accumulate into
+> the **CPU's existing FMA** through the APU port, while a CPU-priority arbiter — routing each result
+> by an owner tag so it never has to drain the pipeline — keeps the CPU's own floating-point
+> instructions first in line. The coprocessor is **pipelined**: for a batched matrix product it issues
+> the batch's independent MACs back-to-back, so a single unit keeps the shared FMA full regardless of
+> its latency.
 
 The contributions of the work are:
 
-- A **resource-shared floating-point coprocessor**: dot-product / reduction acceleration with
-  **zero additional floating-point datapath area**, achieved by multiplexing the coprocessor's
-  operands onto the core's APU/FPnew interface.
-- A **CPU-priority sharing arbiter** with a correct stall / drain / resume protocol that preserves
-  the architectural floating-point state of the CPU bit-exactly.
-- A **quantified area / throughput trade-off study** comparing the shared design against the
-  cost of an otherwise-equivalent design that owns a dedicated FMA.
+- **FMA time-sharing without a second FPU:** a reduction coprocessor with **zero added floating-point
+  datapath**, multiplexing its operands onto the core's APU/FPnew interface.
+- A **CPU-priority, owner-tagged, no-drain arbiter** that keeps the CPU's floating-point path first,
+  routes out-of-order results to their correct owner, and preserves the CPU's architectural
+  floating-point state bit-exactly.
+- A **pipelined batched-reduction coprocessor** that issues *B* independent batch-MACs back-to-back to
+  hide the FMA pipeline latency, so `cyc/MAC` is independent of *L* and one unit saturates the FMA —
+  making a second coprocessor unnecessary.
+- **Bit-exactness by construction** — using the CPU's own FMA and preserving each dot product's
+  summation order — verified across every latency, policy, and co-execution configuration.
+- A **quantified area / frequency study** (silicon-representative synthesis) showing the sharing costs
+  an arbiter, not an FMA, together with a **co-execution** demonstration of the CPU and coprocessor
+  sharing the one FMA concurrently and bit-exactly.
 
 ### 1.3 Scope of this report
 
-This is a progress report. It documents, in full, the completed standalone-feasibility work
-(Phases X0–X2) and the completed on-SoC bring-up and accelerator-tap work (Phases Y0–Y1), specifies
-the architecture of the contribution, and lays out the remaining phases. The sharing arbiter itself
-— the novelty — is designed and scheduled but not yet implemented; this is stated explicitly so that
-the boundary between completed and planned work is unambiguous.
+This report documents the completed work end to end: the standalone-feasibility phases (X0–X2), the
+on-SoC bring-up and accelerator tap (Y0–Y1), and the contribution itself — the CPU-priority sharing
+arbiter and the pipelined coprocessor (Y2–Y3) — together with the performance, area, and frequency
+measurements. Earlier design points (the interleaved-pair dot product of Phase X2, the serial
+single-image GEMV, and the two-coprocessor variant) are described where they illuminate the final
+design's rationale, and are explicitly marked as superseded so the boundary between the design's
+evolution and its final form is unambiguous. Full measurement tables live in the companion reports
+(Appendix A).
 
 ---
 
@@ -176,8 +196,10 @@ defined once in `hw/core-v-mini-mcu/include/fifo_pkg.sv`.
 A second, equally important property of this interface is that the accelerator's `full` / `alm_full`
 status propagates as **back-pressure** all the way to the read master: when the accelerator cannot
 accept data, the write-FIFO push stalls, the read FIFO fills, and the read master stops issuing
-requests. This natural back-pressure path is the foundation of the sharing arbiter's **drain**
-behavior (Phase Y2).
+requests. This natural back-pressure lets the coprocessor stall its own operand stream whenever the
+shared FMA is momentarily unavailable, so no in-flight data is ever lost — and, as the final design
+shows, the owner-tagged arbiter reclaims the FMA for the CPU without having to drain the pipeline at
+all (Phase Y2).
 
 ---
 
@@ -186,38 +208,70 @@ behavior (Phase Y2).
 ### 3.1 Overview
 
 ```
-   CV32E40P (cv32e40px) core ──(APU: regfile operands)──┐
-                                                         ├─►[APU arbiter + MUX]─► FPnew FMA ─► result
-   DMA + dot-product accel ──(a, b, acc via APU port)────┘   ▲ CPU priority,        │
-        │                                                    │ drain / resume       │
-        │  DMA read master streams interleaved                └──── result routing ──┘
-        │  [a0,b0,a1,b1,...] from SRC_PTR
-        │  HW-FIFO: read data → accel (pair, fmadd, accumulate) → result → write master → DST_PTR
+   CV32E40P (cv32e40px) core ──(APU: regfile operands, tag=CPU)──┐
+                                                                  ├─►[dma_apu_arbiter]─► FPnew FMA ─► result
+   DMA + pipelined coprocessor ──(fmadd operands, tag=acc)────────┘   ▲ CPU priority,        │  (+ owner tag)
+        │                                                             │ no drain, grants     │
+        │  DMA read master streams the weight matrix from SRC_PTR      │ every cycle          │
+        │  HW-FIFO: read data → coprocessor (issue B MACs/weight to    └── tag-routed result ─┘
+        │           the shared FMA, collect) → results → write master → DST_PTR
    [X-HEEP crossbar, CPU-priority] ── shared memory ── on-chip RAM
 ```
 
-Two resources are shared between the CPU and the coprocessor, and both are arbitrated with **CPU
-priority**:
+Two resources are shared between the CPU and the coprocessor, both arbitrated with **CPU priority**:
 
-1. The **FPnew FMA**, to be shared through an arbiter inserted at the core's APU boundary inside
-   `cv32e40px_top`. This is the contribution of the thesis (Phase Y2).
-2. The **memory bus**, already shared through the X-HEEP crossbar, which merges the DMA's masters
-   with the CPU's ports. (This required no new work — a benefit of building on X-HEEP.)
+1. The **FPnew FMA**, shared through the `dma_apu_arbiter` inserted at the core's APU boundary inside
+   `cv32e40px_top` — the contribution of the thesis (Phase Y2). The arbiter round-trips a **2-bit owner
+   tag** with every operation, so a result returns to its correct requester even when operations retire
+   out of order; this is what lets it **grant every cycle with no drain** — it never stalls the pipeline
+   to switch owners, which is exactly what makes the coprocessor's pipelined multi-issue possible with
+   no arbiter change. The grant policy is an elaboration-time parameter (only the selected one
+   synthesizes): **P0** CPU-strict (default — the CPU always wins, the coprocessor takes the cycles it
+   leaves), **P1** round-robin, **P2** QoS-weighted.
+2. The **memory bus**, already shared through the X-HEEP crossbar, which merges the DMA's masters with
+   the CPU's ports. (This required no new work — a benefit of building on X-HEEP.)
 
-### 3.2 Operand layout and data flow
+### 3.2 The layer protocol and data flow
 
-The dot product `Σ aᵢ·bᵢ` requires two operand streams. To remain within the single-read-stream
-model of the HW-FIFO interface, the operands are laid out **interleaved** in memory:
-`[a0, b0, a1, b1, …, a_{N-1}, b_{N-1}]`. The read master delivers this single stream; the accelerator
-pairs consecutive pushes (first `a`, then `b`), computes `acc ← fma(a, b, acc)`, and after `N` pairs
-presents the scalar `acc` as a single output word, which the write master stores to the destination
-pointer. The interleaved layout is a deliberate, documented design choice: it avoids a second read
-master and its associated bus and ordering complexity, at the cost of a one-time host-side data
-reorganization. The transfer reads `2N` words and produces one result word; this input/output length
-mismatch is reconciled by the `hw_fifo_done_i` termination signal rather than by the write counter —
-a mechanism validated in Phase Y1 with an integer reduction.
+The final coprocessor computes a **batched matrix product** `Y[M][B] = W[M][N] · X[N][B]` (`B = 1` is a
+matrix-vector product). It is **input-stationary**: the `B` input vectors are buffered once, and each
+streamed weight is reused across all `B` batch lanes (weight-reuse without weight-stationary storage).
+One layer is two back-to-back DMA transfers on the coprocessor's HW-FIFO channel:
 
-### 3.3 Where the accelerator lives
+1. **LOAD** — a header `[N, M, B]` (dot length, output rows, batch), then the `B` input vectors, latched
+   into the coprocessor's input buffer.
+2. **WEIGHT** — the whole `M×N` weight matrix streamed once. A FIFO **flush** between the two transfers
+   flips the coprocessor into its compute phase; per streamed weight it issues `B` MACs to the shared
+   FMA (one per lane) and, after the row's `N` weights, emits the `M×B` results back over the same
+   channel, terminating with `hw_fifo_done`. (LeNet layer-1 has `M·N = 235 200 > 65 535`, the DMA's
+   16-bit size limit, so its weights travel as one 2-D transfer.)
+
+This input-stationary, whole-matrix feed is the dataflow that makes the accelerator win: an earlier
+interleaved-pair layout (Phase X2, §5.3) and per-neuron DMA reprogramming were *slower* than the CPU
+because the host marshalling cost as much as the dot product itself; streaming the weights directly
+from their natural contiguous layout removes that overhead entirely (§11).
+
+### 3.3 The pipelined engine
+
+The coprocessor (`dma_fp_dot_accel_pipe`) has **no local multiplier** — every MAC is one `fmadd`
+issued to the shared FMA over the APU. Its engine is pipelined via a decoupled **issue / collect**
+structure: an **issue pointer** offers one MAC per granted cycle across the `B` lanes for the current
+weight (operands `{acc_q[iss_b], w_q, x[iss_b][i]}`); a **collect pointer** writes each returning
+result to its lane. Because FPnew's ADDMUL lane is an in-order pipeline and the coprocessor's in-flight
+MACs are all the same op and latency, they retire in issue order, so a simple round-robin collect
+counter suffices — no per-op tag inside the block. Up to `L+1` MACs are in flight at once, keeping the
+FMA full; a one-line hazard interlock (`inflight < B`) stalls issue only when the batch cannot cover
+the latency (`B < L+1`), and for `B ≥ L+1` never fires. The input buffer is a 1R1W submodule
+(`xbuf_ram`, an SRAM macro in silicon).
+
+**Bit-exactness is structural.** Each output `Y[r][b] = Σ_{k} W[r][k]·X[k][b]` accumulates in order
+`k = 0..N−1` per lane; the pipeline interleaves *across* lanes (independent sums), never within a
+single dot product, so every summation order is unchanged — identical to a serial unit and, since the
+coprocessor uses the CPU's own FMA, to the CPU, at every latency and under concurrent CPU FP traffic.
+At runtime `B = 1` the interlock serializes issue, reproducing exact memory-bound behavior from one
+RTL and one correctness argument.
+
+### 3.4 Where the accelerator lives
 
 X-HEEP deliberately exposes the HW-FIFO ports at the microcontroller boundary so that an accelerator
 attaches **at the system/top level, outside the CPU core** — the platform's example accelerators do
@@ -245,8 +299,8 @@ on-SoC-integration part (Phases Y, inside the full X-HEEP system).
 | **— pivot —** | Move integration from a bespoke core testbench to the X-HEEP platform (rationale in §5.4) | **Done** |
 | **Y0** | Generate a minimal FPU + DMA X-HEEP MCU, build it on Verilator, and establish the CPU-only dot-product baseline | **Complete** |
 | **Y1** | Attach an FP-free reduction accelerator to the DMA HW-FIFO and prove the tap on the real SoC from C | **Complete** |
-| **Y2** | **The contribution:** replace the accelerator's local arithmetic with the shared CPU FPnew via the APU arbiter (CPU-priority drain/resume) | Planned |
-| **Y3** | Measurement: coprocessor-vs-CPU cycles, and the shared-vs-dedicated area study (no second FPU) | Planned |
+| **Y2** | **The contribution:** replace the accelerator's local arithmetic with the shared CPU FPnew via the APU arbiter (CPU-priority, owner-tagged, no-drain); evolve the datapath to the input-stationary batched-GEMM and finally the **pipelined single coprocessor** that hides FMA latency | **Complete** |
+| **Y3** | Measurement: performance sweeps (L × policy, bit-exact) on toy MLP and real LeNet, co-execution, and the shared-vs-dedicated **area & Fmax** study at the 260 MHz operating point (no second FPU) | **Complete** |
 
 ---
 
@@ -433,9 +487,11 @@ directly into Phase Y2.
   explicitly provides for accelerators, as an external block with its own state, rather than by
   modifying the engine's internal stages. This keeps the DMA RTL untouched and isolates the
   contribution.
-- **Operand sourcing = interleaved memory layout.** A single read stream delivering `[a0,b0,a1,b1,…]`
-  avoids a second read master and cross-stream synchronization, at the cost of a one-time host-side
-  interleave.
+- **Operand sourcing = input-stationary batched GEMM.** The `B` inputs are buffered once and each
+  streamed weight is reused across all lanes, so the DMA delivers a single contiguous weight stream
+  from its natural layout — no second read master, no host-side operand marshalling. (The earlier
+  interleaved-pair layout of Phase X2 was retired precisely because that marshalling cost as much as
+  the dot product; §11.)
 - **Result returned to memory, termination by `done`.** The scalar result is written back through the
   write master and read by the CPU; the *N*-in/1-out mismatch is handled by `hw_fifo_done_i`, not by
   the write counter — validated in Y1.
@@ -464,47 +520,40 @@ Verification proceeds bottom-up, one self-checking layer at a time:
    result, and self-check against a CPU-computed reference through a memory-mapped exit code. *Done
    for the CPU baseline (Y0) and the accelerator tap (Y1); will be extended to the shared-FMA dot
    product in Y2.*
-4. **Latency sweep.** The FMA latency parameter (0/1/2/…) will be swept; the sharing and drain logic
-   is only meaningfully exercised at latency ≥ 1, where a naïve design would hang or corrupt state.
-   *Planned, Y2.*
-5. **Instruction-set co-simulation** (lock-step against a reference model) will prove that the CPU's
-   architectural floating-point state is bit-identical with and without the coprocessor active — the
-   strongest correctness guarantee for a shared functional unit. *Planned, end of Y2.*
+4. **Latency × policy sweep.** The FMA latency (`FPU_ADDMUL_LAT` = 0..5) and arbiter policy (P0/P1/P2)
+   are swept — 21 configurations per benchmark — each checked **bit-exact** against a CPU golden
+   forward pass. This both exercises the owner-tagged routing at every latency (where a naïve design
+   would hang or corrupt state) and demonstrates the pipelining result (`cyc/MAC` flat in *L*). *Done,
+   toy MLP and real LeNet.*
+5. **End-to-end model correctness.** The real LeNet-300-100 predictions are checked against the MNIST
+   labels and an offline NumPy reference — **8/8** correct across every configuration — so bit-exactness
+   is confirmed not just against the CPU's own loop but against an independent float32 model. *Done.*
 
-Layers (1)–(3) are complete through Phase Y1.
+All five layers are complete; the design is verified bit-exact end to end across the full latency and
+policy sweep on both a toy MLP and a real published network.
 
 ---
 
 ## 9. Current Status and Next Steps
 
-**Completed.** The DMA substrate and its HW-FIFO accelerator interface are verified standalone; a
-dot-product accelerator has been driven correctly by the real FPnew FMA; a full FPU+DMA X-HEEP SoC
-builds and simulates correctly on Verilator with a measured CPU dot-product baseline of 303 cycles;
-and a floating-point-free reduction accelerator has been proven, on the real SoC from C, to tap the
-DMA's hardware-FIFO datapath and return a correct result.
+**Completed — the whole design and its evaluation.** The pipelined single coprocessor and the
+CPU-priority, owner-tagged, no-drain APU arbiter are integrated on X-HEEP and verified end to end. The
+coprocessor issues every multiply-accumulate to the CPU's own FPnew FMA; a full `L × policy` sweep
+(21 configurations each) on a toy MLP and on real LeNet-300-100 is **bit-exact** at every point, with
+LeNet **8/8** MNIST-correct. Performance shows `cyc/MAC` **flat in L** (≈ 1.14 / 1.12), **5.45× / 8.37×**
+over the CPU, ~87–88 % FMA utilization; co-execution has the CPU's own FP DSP kernel running
+concurrently on the shared FMA at negligible cost; and Synopsys DC-NXT (TSMC 40 nm) gives the area and
+Fmax at the converged **260 MHz** operating point with a per-component breakdown, from which the "no
+second FPU" claim is quantified (arbiter = 8.4 % of one FMA; 3.9× less added area per accelerator).
+Verilator cycle counts convert to wall-clock at that operating point (× 3.845 ns). Full tables are in
+the companion reports (Appendix A).
 
-**Phase Y2 — the contribution: floating-point sharing.** Replace the Y1 accelerator's integer
-accumulate with a floating-point fused multiply-add executed on the **CPU's own FPnew**, reusing the
-Y1 tap and the Part-I accelerator datapath. This requires three coordinated pieces: (i) promoting the
-accelerator to the dot-product datapath (pair `(a,b)`, request `fma(a,b,acc)` on an APU-style port —
-the verified X2 module); (ii) inserting a **CPU-priority arbiter** at the APU boundary inside
-`cv32e40px_top` that grants the FMA to the coprocessor only when the CPU is not using it, and
-**drains/stalls** the coprocessor the moment the CPU issues a floating-point instruction — exploiting
-the HW-FIFO back-pressure path so no in-flight data is lost, extending the FMA clock-gate to keep it
-clocked during coprocessor-only activity, and masking the response so each result returns to its
-correct requester; and (iii) threading the coprocessor's APU port out of the core through the SoC
-hierarchy to the accelerator. A set of correctness rules — single-source response masking,
-clock-gate extension, atomic operand switching, well-defined drain exit, confinement to the ADDMUL
-operation group, and preservation of `fflags` — has been enumerated and will be enforced and
-asserted, then checked by the latency sweep and instruction-set co-simulation.
-
-**Phase Y3 — measurement.** Quantify the coprocessor's dot-product cycle count against the 303-cycle
-CPU baseline; sweep the scalar-floating-point instruction frequency to characterize the cost of
-CPU-priority drain; and — as the central quantitative claim — compare the **area** of the shared
-design against a dedicated-FMA equivalent (Synopsys Design Compiler), demonstrating that the sharing
-saves an entire FMA. For the area study the accelerator is moved into the synthesizable system, and
-the design is parameterized so the coprocessor can be included or excluded for baseline-vs-augmented
-comparison of both cycles and area.
+**Open / optional (not blocking).** (i) FMA-specific critical path — `report_timing -through` is wired
+into the flow; a 0.1 ns re-run yields the FMA's own fmax versus *L*. (ii) Full-SoC synthesis for the
+absolute chip clock and full-SoC wall-clock (the 260 MHz figure is the *core*'s fmax). (iii) Energy per
+MAC via DC power (shared vs dedicated — the strongest "no second FPU" argument). (iv) A `base`
+(no-arbiter) core run to express the arbiter's clock cost as a delta. (v) Verify the related-work
+citations (§10). The core measurement and area programme is otherwise complete.
 
 ---
 
@@ -546,18 +595,29 @@ family. All instantiate new floating-point hardware; this thesis deliberately do
 
 **Novelty statement.** *Unlike prior shared-FPU designs, which multiplex a floating-point unit among
 peer cores with fair (round-robin) arbitration, and unlike streaming FP accelerators such as Snitch
-and NTX, which feed a dedicated FPU, we time-share the host core's single existing FMA between the
-CPU and a DMA-fed reduction coprocessor through the APU interface, governed by an asymmetric
-CPU-priority stall/drain/resume arbiter — adding no floating-point datapath.* The three closest
-individual works to differentiate against are **NTX** (FP reduction + streaming, but a dedicated
-FPU), the **dual-core RISC-V MAC-reuse** design (CPU-priority sharing, but an integer MAC between
-peer cores), and **Snitch** (elides overhead to feed a dedicated FPU). *(Coverage note: the
-streaming and compute-in-DMA axes warrant a deeper dedicated search before the final related-work
-chapter.)*
+and NTX, which feed a dedicated FPU, we time-share the host core's single existing FMA between the CPU
+and a DMA-fed reduction coprocessor through the APU interface, under an asymmetric strict-CPU-priority,
+owner-tagged, no-drain arbiter — adding no floating-point datapath — and we pipeline the coprocessor so
+one unit hides the FMA's latency and saturates it alone.* The three closest individual works to
+differentiate against are **NTX** (FP reduction + streaming, but a dedicated FPU), the **dual-core
+RISC-V MAC-reuse** design (CPU-priority sharing, but an integer MAC between peer cores), and **Snitch**
+(elides overhead to feed a dedicated FPU). *(Coverage note: the streaming and compute-in-DMA axes
+warrant a deeper dedicated search before the final related-work chapter.)*
 
 ---
 
-## 11. Measurement — Phase Y3 (in progress): the length-scaling study
+## 11. Measurement and Evaluation
+
+> **Reading guide.** This section traces the design's *evaluation journey* — from the first serial,
+> single-image measurements, through the dense-layer / convolution / LeNet demonstrations and the
+> two-coprocessor experiment, to the **final pipelined single coprocessor** (§11.10) that retires them
+> all. Earlier subsections' absolute numbers are therefore **superseded** by the pipelined design; they
+> are kept because each established a fact the final design relies on — the input-stationary dataflow,
+> bit-exactness on real models, the co-execution guarantee, and the latency-hiding diagnosis that
+> motivated pipelining. **Authoritative final numbers** live in the companion reports:
+> `PERF_BENCH_PIPE_SWEEP.md`, `PERF_LENET_PIPE_SWEEP.md`, and `DC_STUDY_OPERATING.md`.
+
+### 11.1 Length scaling (serial single — superseded)
 
 The first quantitative study sweeps the dot-product length *N* and, for each *N*, measures both the
 CPU-only kernel and the shared-FMA coprocessor path on the same SoC. A single firmware
@@ -706,7 +766,13 @@ measured in Synopsys Design Compiler NXT (TSMC 40 nm G, RVT, SS/0.81 V/125 °C c
 DesignWare arithmetic; each module synthesized **standalone** so no logic is optimized away). Every
 module was re-synthesized in one consistent run of the current 3-requestor design, and the ADD/MUL
 pipeline latency L was swept 0..5; at this relaxed clock all timing slacks are large, so the areas are
-area-optimal rather than timing-inflated. Full per-L and per-policy tables are in `AREA_REPORT.md`.
+area-optimal rather than timing-inflated. *(These are the early standalone-per-module figures at a
+relaxed 100 MHz; the **final, authoritative area** is measured differently — every component extracted
+in-context from one hierarchy-preserved `cv32e40px_top` synthesis at the converged **260 MHz operating
+point** — and is reported in `DC_STUDY_OPERATING.md`. There the FMA is 21.5 k µm² and the P0 arbiter
+1.8 k µm² = 8.4 % of one FMA / 2.0 % of the core, giving 3.9× less added area per accelerator than a
+dedicated FMA. The absolute numbers below differ from the operating-point report for exactly this
+methodology reason; the **ratio** — arbiter ≪ FMA — is the invariant claim and holds in both.)*
 
 | Block | Role | Cell area (µm², L = 0) |
 |---|---|---:|
@@ -872,7 +938,7 @@ the CPU's own job while it streams, synchronize) so the two truly overlap:
 
 Three findings hold across both. **(1) Correctness under contention:** every result — the CPU's job and
 the coprocessor's — is *bit-identical* to the same computation run alone, so time-sharing the FMA on
-concurrent live traffic corrupts nothing; the arbiter's stall/drain/resume is transparent. **(2) The
+concurrent live traffic corrupts nothing; the arbiter's mediation is transparent. **(2) The
 CPU is not starved:** its floating-point job runs only 3.9–6.8 % slower with the coprocessor active
 concurrently, and that residual is memory-*bus* arbitration (both masters fetch operands from the same
 SRAM), not FMA starvation — the CPU-priority guarantee holds on live, workload-generated contention,
@@ -989,8 +1055,10 @@ sharing (+11 % and +61 %). That asymmetry is the design intent made measurable: 
 floating-point work is protected by construction, and the coprocessors are best-effort.
 
 Comparing the three policies (0/1/2), sweeping the FMA latency L = 0..5, and moving from this toy MLP to
-the real **LeNet-300-100** network were the subsequent measurements, and they are now complete (full,
-self-contained tables in `PERF_SWEEP_REPORT.md` and `LENET_SWEEP_REPORT.md`). Their headline findings, with
+the real **LeNet-300-100** network were the subsequent measurements for this **two-coprocessor**
+design; their headline findings are summarized next, but note the whole dual design is **retired by the
+pipelined single coprocessor of §11.10** (whose final sweeps are in `PERF_BENCH_PIPE_SWEEP.md` and
+`PERF_LENET_PIPE_SWEEP.md`). The dual findings, with
 the coprocessor run **batched** (B = 8) so the shared FMA — not the operand bus — is the bottleneck: **(i)**
 batching flips the memory-bound single-image GEMV into a compute-bound GEMM (LeNet, L = 0: 1.12 cyc/MAC,
 ≈ 88 % FMA-issue utilisation, **8.34× vs the CPU**, all bit-exact, and 8/8 MNIST images classified
@@ -1002,7 +1070,7 @@ under two accelerators, full round-robin costs it more, and the QoS weights dial
 +13 % to +103 % and the two accelerators' balance (channel imbalance 223 → ~762 k cycles). Every trend
 measured on the toy MLP reproduces on the real network, with a higher headline speedup.
 
-### 11.x A pipelined coprocessor hides the FMA latency with a single unit
+### 11.10 The final design — a pipelined coprocessor hides the FMA latency with a single unit
 
 The dual-coprocessor result of the previous subsection is best read as a diagnosis rather than a
 destination. The second coprocessor helped *only because the first one was serial*: the accelerator
@@ -1044,8 +1112,9 @@ the pipelined single coprocessor is the clean realisation of that idea, hiding t
 cost (the FMA pipeline latency) without adding a second coprocessor, a second FPU, or any change to the
 CPU-priority arbiter. The two designs are kept side by side (`dma_fp_dot_accel_is` serial baseline,
 `dma_fp_dot_accel_pipe` pipelined) precisely so the latency term can be shown appearing and then
-vanishing; the full tables are in `PIPE_BENCH_REPORT.md` and `PIPE_LENET_REPORT.md`, and the area cost of
-the pipelining logic is measured alongside the serial unit by `dc/run_area.sh`.
+vanishing; the full pipelined sweeps are in `PERF_BENCH_PIPE_SWEEP.md` and `PERF_LENET_PIPE_SWEEP.md`,
+and the area and Fmax of the design at its 260 MHz operating point (core with arbiter, coprocessor
+separate) are in `DC_STUDY_OPERATING.md`, produced by the `dc_scripts/` flow.
 
 ---
 
@@ -1072,6 +1141,24 @@ printed results) is captured in the simulation build directory's `uart0.log`.
 **Accelerator tap (Y1):** `tb/dma_sum_accel.sv` on DMA channel 1 (wired via `tb/testharness.sv.tpl`
 and `tb/x-heep-tb-utils.core`); C driver `sw/applications/y1_sum_test` (`hw_fifo_en = 1`,
 `channel = 1`, polling) → **`dst[0] = 136 = golden`, PASS**.
+
+**Final design (pipelined single coprocessor).**
+- **RTL:** `tb/dma_fp_dot_accel_pipe.sv` (the pipelined coprocessor) + `tb/xbuf_ram.sv` (input buffer);
+  `tb/dma_fp_dot_accel_is.sv` is the serial baseline kept for the latency comparison. The
+  `dma_apu_arbiter` lives in `cv32e40px_top.sv` behind `` `ifdef COPROC_FPU_SHARE ``. The
+  `tb/testharness.sv.tpl` `COPROC_PIPE`/`COPROC_SERIAL` knob selects which coprocessor is instantiated.
+- **Benchmarks:** `sw/applications/perf_bench_pipe/` (toy MLP 128-64-32-16, B = 8) and
+  `sw/applications/perf_lenet_pipe/` (real LeNet-300-100 / MNIST, weights from `example_model/`), each
+  printing the five setup/load/compute/total metrics and a bit-exactness / accuracy check.
+- **Performance sweep:** `./sweep.sh` runs the 21 configs (L = 0..5 × policy P0/P1/P2, + QoS weight
+  variants at L0) into `sweep_results/bench_pipe/` and `sweep_results/lenet_pipe/`; every config reports
+  `bit-exact = 1` (LeNet also `8/8`). Tables: `PERF_BENCH_PIPE_SWEEP.md`, `PERF_LENET_PIPE_SWEEP.md`.
+- **Area & Fmax (DC-NXT):** `dc_scripts/converge.sh` finds the operating clock (`CLK += |WNS|/2` →
+  3.845 ns = **260 MHz**), then `dc_scripts/study.sh` synthesizes all configs at that clock,
+  hierarchy-preserved, extracting FMA / FPU / arbiter / core from one `cv32e40px_top` run and the
+  coprocessor separately. TSMC 40 nm G, `sc12mc_cln40g_base_rvt`, SS/0.81 V/125 °C. Report:
+  `DC_STUDY_OPERATING.md`.
+- **Real time:** any cycle count × **3.845 ns** = wall-clock at the core's 260 MHz operating point.
 
 ## Appendix B — Hardware-FIFO accelerator interface (X-HEEP)
 
@@ -1122,7 +1209,7 @@ we edited.
 | `tb/x-heep-tb-utils.core` | E | Added `dma_sum_accel.sv` to the `tb-harness` file set so it is compiled into the simulation. |
 | `sw/applications/y1_sum_test/main.c` | N | **Phase Y1 C driver.** Programs a HW-FIFO DMA transfer on channel 1 (`hw_fifo_en = 1`, `channel = 1`), polls for completion, checks `dst[0]` against a software golden sum → `PASS` (136). |
 
-### Part III — Y2: floating-point sharing arbiter (in progress)
+### Part III — Y2: the floating-point sharing arbiter
 
 | File | Kind | What & why |
 |------|:---:|------------|
@@ -1242,14 +1329,37 @@ LeNet inference — the headline "two independent FP jobs share one FMA" scenari
 inflated by `printf`s inside the `mcycle` window; the clean figure is 556 318 (confirmed by two
 independent runs), giving the corrected 4.79× single-inference speedup.
 
+### Part IV — the final pipelined single coprocessor (2026-08)
+
+| File | Kind | What & why |
+|------|:---:|------------|
+| `tb/dma_fp_dot_accel_pipe.sv` | N | **The final coprocessor.** Pipelined batched-GEMM: decoupled issue/collect pointers (`iss_b`/`col_b`), up to `L+1` MACs in flight, one-line hazard interlock `inflight < B`, in-order collect (no per-op tag). Reads header `[N,M,B]`; input-stationary; `B = 1` degenerates to serial. `MAXN = 1024`, `MAXB = 8`. (`inflight` widened to 16 bits to satisfy a Verilator WIDTHEXPAND check.) |
+| `tb/dma_fp_dot_accel_is.sv` | E | Serial baseline retained for the latency comparison; the `GEMV_ONLY` parameter removed so it is a clean batched-GEMM (`NB = MAXB`, `BEFF = bn_q`). |
+| `tb/xbuf_ram.sv` | N | 1R1W input buffer submodule (an SRAM macro in silicon; black-boxed in the DC area run). |
+| `dma_apu_arbiter.sv` (in `cv32e40px_top.sv`) | E | Generalized to 3 requestors (CPU + acc0 + acc1) with a **2-bit owner tag**, **no drain** — grants every cycle, so pipelined multi-issue needs no arbiter change. Swappable elaboration-time policy `ARB_POLICY_SEL` = P0 CPU-strict / P1 round-robin / P2 QoS-weighted. |
+| `tb/testharness.sv.tpl` | E | `COPROC_PIPE` / `COPROC_SERIAL` knob selecting the pipelined vs serial coprocessor for acc0; acc1 left idle (no cycles). |
+| `tb/x-heep-tb-utils.core` | E | Added `dma_fp_dot_accel_pipe.sv` (and `xbuf_ram.sv`) to the fileset. |
+| `sw/applications/perf_bench_pipe/main.c` | N | Toy MLP 128-64-32-16, B = 8; five metrics (CPU inference, CPU FIR, coproc inference, shared CPU FIR, shared coproc) each setup/load/compute/total, + a RAPOR block; bit-exact + cyc/MAC + speedup. |
+| `sw/applications/perf_lenet_pipe/main.c` | N | Same five-metric structure on the real LeNet-300-100 / MNIST (weights via `example_model/`), 2-D weight transfer for layer-1, `argmax` accuracy → `8/8`. |
+| `sweep.sh` | E | Drives the 21-config L × policy sweep (+ QoS weight variants) for the pipe apps into `sweep_results/bench_pipe/` and `sweep_results/lenet_pipe/`. |
+| `dc_scripts/` | N | Reorganized DC-NXT flow: `converge.sh` (`CLK += |WNS|/2` → 260 MHz operating point), `study.sh` + `study.tcl` (hierarchy-preserved area/Fmax, per-component extraction, FMA-specific `report_timing -through`), `rtl_core.f` / `rtl_accel_pipe.f` filelists. Outputs to `dc_reports/`, work in `dc_work/`. |
+| `PAPER_NOTES.md`, `PERF_BENCH_PIPE_SWEEP.md`, `PERF_LENET_PIPE_SWEEP.md`, `DC_STUDY_OPERATING.md` | N | The compact technical dossier and the three companion measurement reports (Appendix A). |
+
+**Result (final):** `cyc/MAC` flat in L (≈ 1.14 MLP / 1.12 LeNet), **5.45× / 8.37×** vs CPU, all
+bit-exact (LeNet 8/8); co-execution CPU FIR + coproc share one FMA at negligible cost; DC-NXT at
+**260 MHz** gives arbiter = 8.4 % of one FMA, 3.9× less added area per accelerator than a dedicated FMA.
+The pipelined single unit retires the dual as the headline design.
+
 ---
 
-*This report reflects the state of the work through Phase Y3 (measurement, in progress). The
-floating-point sharing arbiter that constitutes the thesis's central contribution is implemented and
-demonstrated end-to-end on the real SoC (Phase Y2): a 32-element single-precision dot product computed
-on the CPU's own FMA in 208 cycles vs the 303-cycle CPU baseline, with no added floating-point
-datapath. Phase Y3 has characterized length scaling (break-even N ≈ 16, asymptote ≈ 3.5×) and
-concurrency (independent non-floating-point CPU work sees ≈0 added latency; the residual is baseline
-memory-bus arbitration), and verified that the entire coprocessor reverts to stock X-HEEP behind a
-single define. Remaining: the FMA-latency drain sweep, a pipelined accelerator, and the area
-comparison that quantifies the "no second FPU" claim.*
+*This report reflects the completed final design. The contribution — a CPU-priority, owner-tagged,
+no-drain APU arbiter that time-shares the CPU's one FMA, driven by a **pipelined single coprocessor**
+that issues a batch's independent MACs back-to-back to hide the FMA latency — is implemented and
+evaluated end-to-end on the real X-HEEP SoC. Across a full L × policy sweep it is **bit-exact** with
+the CPU (LeNet 8/8 MNIST), runs a toy MLP at **5.45×** and LeNet-300-100 at **8.37×** with `cyc/MAC`
+flat in L, co-executes with the CPU's own floating-point work on the one FMA at negligible cost, and —
+synthesized in TSMC 40 nm at its **260 MHz** operating point — adds a **1.8 k µm² arbiter (8.4 % of one
+FMA)** instead of a whole FMA, i.e. **3.9× less added area per accelerator** than a dedicated-FMA
+design: the "no second FPU" claim, quantified. Earlier design points (interleaved-pair dot product,
+serial GEMV, dual coprocessor) are retained above only as the evolution that led here. Optional
+follow-ups (FMA-specific fmax vs L, full-SoC clock, energy/MAC) are listed in §9; none is blocking.*

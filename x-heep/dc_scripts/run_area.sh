@@ -4,7 +4,7 @@
 # Runs every point in a FRESH dcnxt_shell (zero state carryover) with its own WORK
 # dir, then prints the summary tables. Run from anywhere; cd's to x-heep root.
 #
-#   bash dc/run_area.sh
+#   bash dc_scripts/run_area.sh
 #
 # Matrix (10 runs):
 #   (a) full FPU  cv32e40px_fp_wrapper  @ L = 0..5        -> 6 runs
@@ -13,25 +13,25 @@
 #   (d) accel     dma_fp_dot_accel_is   (LOGIC only)      -> 1 run
 #
 # Prereqs on this server:
-#   - Edit LIB_DB at the top of dc/synth_area.tcl to the standard-cell .db here.
+#   - Edit LIB_DB at the top of dc_scripts/synth_area.tcl to the standard-cell .db here.
 #   - The RTL edit that factors x_buf into tb/xbuf_ram.sv must be applied (so the
-#     accel instantiates u_xbuf); dc/rtl_accel_is.f omits xbuf_ram to black-box it.
+#     accel instantiates u_xbuf); dc_scripts/rtl_accel_is.f omits xbuf_ram to black-box it.
 #=============================================================================
 set -u
 cd "$(dirname "$0")/.."                     # -> x-heep root
-mkdir -p dc/reports
+mkdir -p dc_reports
 CLK_NS="${CLK_NS:-10.0}"
 DCSH="${DCSH:-dcnxt_shell}"                  # DC shell binary (dcnxt_shell = DC NXT).
                                             # override w/ full path if not in PATH, e.g.:
-                                            #   DCSH=/2tb/ECE/synopsys/2025-26/bin/dcnxt_shell bash dc/run_area.sh
+                                            #   DCSH=/2tb/ECE/synopsys/2025-26/bin/dcnxt_shell bash dc_scripts/run_area.sh
 
 # --- run one point in a fresh dcnxt_shell.  $1 = RUN label (must equal what the tcl
 #     builds from TOP+suffix); remaining args = env assignments (incl TOP) --------
 runone() {
     local RUN="$1"; shift
     echo "########################  SYNTH: $RUN  ########################"
-    rm -rf "dc/work/$RUN" "dc/reports/area_${RUN}.rpt" "dc/reports/area_${RUN}_hier.rpt"
-    env "$@" CLK_NS="$CLK_NS" "$DCSH" -f dc/synth_area.tcl 2>&1 | tee "dc/reports/log_${RUN}.txt"
+    rm -rf "dc_work/$RUN" "dc_reports/area_${RUN}.rpt" "dc_reports/area_${RUN}_hier.rpt"
+    env "$@" CLK_NS="$CLK_NS" "$DCSH" -f dc_scripts/synth_area.tcl 2>&1 | tee "dc_reports/log_${RUN}.txt"
 }
 
 # ============================== RUN THE MATRIX ==============================
@@ -49,11 +49,11 @@ runone "dma_fp_dot_accel_pipe"         TOP=dma_fp_dot_accel_pipe
 
 # ================================ SUMMARY ==================================
 # Total cell area from a flat area report.
-area_of() { grep -i "Total cell area" "dc/reports/area_$1.rpt" 2>/dev/null | tail -1 | awk '{print $NF}'; }
+area_of() { grep -i "Total cell area" "dc_reports/area_$1.rpt" 2>/dev/null | tail -1 | awk '{print $NF}'; }
 ge()      { awk -v a="${1:-}" 'BEGIN{ if(a=="") print "?"; else printf "%.0f", a/0.9576 }'; }  # 1 GE = 0.9576 um^2 (NAND2_X1M_A12TR40)
 # FMA-alone (fpnew_fma_multi) absolute area from the fp_wrapper hierarchy report at latency L.
 fma_of()  { awk '/fpnew_fma_multi/ && $1 ~ /^[0-9]/ {print $1; exit}' \
-              "dc/reports/area_cv32e40px_fp_wrapper_L$1_hier.rpt" 2>/dev/null; }
+              "dc_reports/area_cv32e40px_fp_wrapper_L$1_hier.rpt" 2>/dev/null; }
 
 echo
 echo "##################  AREA SUMMARY  (TSMC40, clk=${CLK_NS} ns)  ##################"
@@ -67,7 +67,7 @@ for L in 0 1 2 3 4 5; do
     else
         r="?"
     fi
-    [ -z "${m:-}" ] && m="MISSING: FMA row ungrouped -> run 'TOP=fpnew_fma_multi L=$L dcnxt_shell -f dc/synth_area.tcl'"
+    [ -z "${m:-}" ] && m="MISSING: FMA row ungrouped -> run 'TOP=fpnew_fma_multi L=$L dcnxt_shell -f dc_scripts/synth_area.tcl'"
     printf "%3s %18s %18s %18s\n" "$L" "${f:-?}" "$m" "$r"
 done
 
