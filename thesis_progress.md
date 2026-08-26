@@ -540,9 +540,12 @@ policy sweep on both a toy MLP and a real published network.
 CPU-priority, owner-tagged, no-drain APU arbiter are integrated on X-HEEP and verified end to end. The
 coprocessor issues every multiply-accumulate to the CPU's own FPnew FMA; a full `L × policy` sweep
 (21 configurations each) on a toy MLP and on real LeNet-300-100 is **bit-exact** at every point, with
-LeNet **8/8** MNIST-correct. Performance shows `cyc/MAC` **flat in L** (≈ 1.14 / 1.12), **5.45× / 8.37×**
+LeNet **8/8** MNIST-correct. Performance shows `cyc/MAC` **flat in L** (≈ 1.14 / 1.12), **5.49× / 8.44×**
 over the CPU, ~87–88 % FMA utilization; co-execution has the CPU's own FP DSP kernel running
-concurrently on the shared FMA at negligible cost; and Synopsys DC-NXT (TSMC 40 nm) gives the area and
+concurrently on the shared FMA at negligible cost, and a pure-FMA stress kernel (§11.11) makes the
+CPU-priority policy separate sharply from round-robin under genuine per-cycle contention (CPU slowed
++6–11 % under P0 vs +64 % under P1) while exposing a CV32E40P limit of ≈ 2 outstanding FP ops; and
+Synopsys DC-NXT (TSMC 40 nm) gives the area and
 Fmax at the converged **260 MHz** operating point with a per-component breakdown, from which the "no
 second FPU" claim is quantified (arbiter = 8.4 % of one FMA; 3.9× less added area per accelerator).
 Verilator cycle counts convert to wall-clock at that operating point (× 3.845 ns). Full tables are in
@@ -1115,6 +1118,44 @@ CPU-priority arbiter. The two designs are kept side by side (`dma_fp_dot_accel_i
 vanishing; the full pipelined sweeps are in `PERF_BENCH_PIPE_SWEEP.md` and `PERF_LENET_PIPE_SWEEP.md`,
 and the area and Fmax of the design at its 260 MHz operating point (core with arbiter, coprocessor
 separate) are in `DC_STUDY_OPERATING.md`, produced by the `dc_scripts/` flow.
+
+### 11.11 Pure-FMA contention: when the arbiter policies actually separate
+
+Every co-execution measurement above uses the CPU's own FIR filter as the foreground workload. The FIR
+is memory-bound — each tap loads an operand — so it issues a floating-point MAC only sparsely, and it
+almost never wants the shared FMA in the *same cycle* as the coprocessor. A consequence, visible
+throughout the sweeps, is that the CPU-strict (P0) and round-robin (P1) policies produce **nearly
+identical** results (e.g. the shared CPU-FIR at L = 0 is 34 590 cycles under P0 versus 34 585 under P1 on
+the toy MLP — a 0.01 % difference). This is not a defect of the arbiter; it is that the workload never
+creates the contention the arbiter exists to resolve. To exercise the arbiter under genuine per-cycle
+FMA contention, a second foreground kernel was added and run concurrently in its place: a **register-only
+multiply-accumulate stress kernel with eight independent accumulators**, which — like the coprocessor's
+own pipelining — issues an FMA to the shared unit on nearly every cycle. (The two foreground kernels are
+run in separate co-execution passes, never together.) Two results follow, and both sharpen the thesis.
+
+**The host core sustains only about two outstanding floating-point operations.** Run alone, the stress
+kernel's cost per fused multiply-add is **flat at ≈ 1.51 cycles for L = 0 and L = 1** (issue-bound — the
+eight accumulators hide the pipeline latency), then rises to **≈ L + 1 for L ≥ 2** (latency-bound:
+3.27, 4.14, 5.13, 6.01 at L = 2..5). Because eight independent accumulators *should* hide up to seven
+cycles of latency, the fact that they stop helping past L = 1 pins a **micro-architectural limit of
+CV32E40P: its APU dispatcher keeps at most ≈ 2 floating-point operations in flight**. The practical
+meaning is that the CPU can *saturate* the shared FMA only at L ≤ 1; at deeper latencies it throttles
+itself and cannot flood the unit however much instruction-level parallelism the code exposes.
+
+**Under genuine contention the CPU-priority guarantee is demonstrated with teeth.** At L ≤ 1, where the
+CPU does saturate the FMA, the policies diverge sharply. Strict CPU priority (P0) slows the CPU's own
+stress kernel by only **+6.4 % (toy MLP) / +11.3 % (LeNet)** — the CPU wins essentially every contested
+cycle and the coprocessor absorbs the contention — whereas round-robin (P1) slows it by **+63.6 % /
++64.2 %**, a **53–57 percentage-point gap** where the FIR had shown none. The asymmetry is the design
+intent made measurable: P0 protects the CPU's own floating-point work by construction, at the cost of
+the coprocessor (which slows more under P0 than under P1: +31 % vs +27 % on LeNet). The QoS policy dials
+the full spectrum between these extremes — CPU-weighted `4:1:1` holds the CPU to +22–26 %, while
+accelerator-weighted `1:4:1` protects the coprocessor (+13–16 %) and lets the CPU pay +137–141 %. For
+L ≥ 2 the policies converge again (P0 ≡ P1 to within measurement noise), precisely because the
+latency-bound CPU no longer issues floating-point densely enough to contend. The takeaway is a clean,
+honest one: **the arbiter policy is decisive exactly when the host can saturate the shared FMA, and the
+near-identical FIR result reflects the workload, not the arbiter.** Full per-latency and per-policy
+tables (metrics [6]–[8]) are in `PERF_BENCH_PIPE_SWEEP.md` and `PERF_LENET_PIPE_SWEEP.md`, §2b.
 
 ---
 
