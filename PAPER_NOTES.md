@@ -112,6 +112,8 @@ Hesaplar: `Y[M][B] = W[M][N] · X[N][B]` (B=1 → matris-vektör). **Decoupled i
   **MAC** (saf-FMA), (7) shared CPU-MAC, (8) shared coproc (MAC) — her biri setup/load/compute/total. FIR =
   memory-bound DSP işi (~8 cyc/fmadd); **MAC = register-only, 8 bağımsız akümülatörlü saf-FMA kernel** (CPU
   her cycle FMA ister → arbiter'ı strese sokar). FIR ve MAC **ayrı** co-execution run'larında (aynı anda değil).
+  **CPU-alone inference = optimize batched baseline** (ağırlık batch-reuse + 8-way ILP, disassembly-verified) —
+  naive değil, adil/savunulabilir kıyas (L=0'da 3.7-4.0 cyc/MAC; naive 8-10 idi).
 - **Sweep'ler:** FMA latency `L=0..5` × arbiter policy `P=0/1/2` (her benchmark 21 config), **hepsi
   bit-exact** → (i) `cyc/MAC` L'den bağımsız mı (pipelining kanıtı), (ii) policy'nin co-execution'a etkisi.
   Benchmark'lar: `perf_bench_pipe` (toy MLP), `perf_lenet_pipe` (gerçek LeNet).
@@ -129,17 +131,22 @@ Hesaplar: `Y[M][B] = W[M][N] · X[N][B]` (B=1 → matris-vektör). **Decoupled i
 
 ## 6. Sonuçlar — teknik özet (ham tablolar §9'daki raporlarda)
 
-### 6.1 Performans
-- **`cyc/MAC` L'den bağımsız:** ≈**1.14** (MLP) / **1.12** (LeNet), L=0..5 düz (serial olsa 1.14+L olurdu).
-- **CPU'ya hızlanma:** **5.49×** (MLP) / **8.44×** (LeNet), L boyunca ~düz.
+- **`cyc/MAC` L'den bağımsız (coproc):** ≈**1.14** (MLP) / **1.12** (LeNet), L=0..5 düz (serial olsa 1.14+L
+  olurdu) → pipelining.
+- **CPU baseline = optimize batched inference** (ağırlık batch-reuse + 8-way ILP, disassembly-verified;
+  naive değil) → speedup şişkin değil, savunulabilir.
+- **CPU'ya hızlanma L ile ARTIYOR:** MLP **2.47× (L=0) → 5.22× (L=5)**, LeNet **3.36× → 6.99×**. Sebep:
+  optimize CPU L ile yavaşlıyor (cyc/MAC MLP 3.72→8.14, LeNet 4.01→8.39 — cv32e40p **~2 outstanding FP** →
+  yüksek L'de FMA pipeline'ını dolduramıyor, latency-bound), coproc ise düz → **fark = pipeline-doldurma
+  avantajı, pipeline derinliğiyle büyür.** L=0 (stock combinational FMA) coproc'un en zorlandığı nokta.
 - **FMA util** (paylaşılan birim) ≈ %87-88 her L'de.
-- **Gerçek zaman @ 260 MHz:** MLP inference **61.3 µs/img** (CPU 337 µs); LeNet **1.21 ms/img** (CPU 10.26
-  ms). **8/8 MNIST doğru**, bit-exact.
+- **Gerçek zaman @ 260 MHz (L=0):** MLP inference **62.1 µs/img** (CPU 154 µs); LeNet **1.22 ms/img** (CPU
+  4.10 ms). **8/8 MNIST doğru**, bit-exact. (L=5'te fark ~5.2× / ~7×'e çıkar.)
 
 ### 6.2 Co-execution (CPU FP işi ∥ coproc inference, tek FMA)
 
-**(a) FIR (memory-bound CPU işi).** CPU-FIR'i coproc inference ile eşzamanlı: coproc'a **+%0.11 (LeNet) /
-+%2.8 (MLP)**, CPU-FIR'e **+%5.4 (LeNet) / +%2.3 (MLP)** (P0). İki FP işi tek FMA'yı ~bedavaya paylaşıyor.
+**(a) FIR (memory-bound CPU işi).** CPU-FIR'i coproc inference ile eşzamanlı: coproc'a **+%0.1 (LeNet) /
++%2.9 (MLP)**, CPU-FIR'e **+%8.4 (LeNet) / +%2.6 (MLP)** (P0). İki FP işi tek FMA'yı ~bedavaya paylaşıyor.
 Ama FIR FMA'yı doldurmadığından **P0 ile P1 burada AYNI** → arbiter'ı ayırt ettirmiyor.
 
 **(b) MAC (saf-FMA CPU işi) — arbiter'ın asıl testi.** Register-only, 8 bağımsız akümülatör → CPU her cycle
@@ -147,11 +154,11 @@ FMA ister, coproc'la gerçekten aynı cycle'da çekişir. İki ana bulgu:
 - **cv32e40p FP-issue tavanı:** MAC-alone `cyc/fmadd` L=0,1'de düz **~1.51** (issue-bound), L≥2'de **≈L+1**
   (latency-bound) → **çekirdek ~2 outstanding FP op** tutuyor (8 akümülatöre rağmen; bir **cv32e40p donanım
   limiti**). Yani CPU FMA'yı ancak **L≤1'de** doyurabiliyor.
-- **Policy'ler AYRIŞIYOR (L≤1, gerçek çekişme):** **P0** CPU-MAC'i **+6.4% (MLP) / +11.3% (LeNet)** yavaşlatır
-  (CPU korunur); **P1** **+63.6% / +64.2%** yavaşlatır (round-robin FMA'yı böler) → **~53–57 puanlık fark**,
-  FIR'de ~0 olan. **CPU-priority garantisinin "dişleri" ilk kez ölçülüyor.** Ödünleşme: P0'da coproc daha çok
-  yavaşlar (LeNet +31% vs P1 +27%). **L≥2'de** CPU latency-bound olduğundan çekişme kalmıyor → **P0≡P1**.
-- **QoS spektrumu (L0):** `w4-1-1` CPU'yu korur (CPU +22–26%), `w1-4-1` coproc'u korur (CPU +137–141%,
+- **Policy'ler AYRIŞIYOR (L≤1, gerçek çekişme):** **P0** CPU-MAC'i **+6.7% (MLP) / +11.3% (LeNet)** yavaşlatır
+  (CPU korunur); **P1** **+64.6% / +66.5%** yavaşlatır (round-robin FMA'yı böler) → **~55–58 puanlık fark**,
+  FIR'de ~0 olan. **CPU-priority garantisinin "dişleri" ölçüldü.** Ödünleşme: P0'da coproc daha çok yavaşlar
+  (LeNet +31% vs P1 +27.8%). **L≥2'de** CPU latency-bound olduğundan çekişme kalmıyor → **P0≡P1**.
+- **QoS spektrumu (L0):** `w4-1-1` CPU'yu korur (CPU +22–28%), `w1-4-1` coproc'u korur (CPU +138–142%,
   coproc +13–16%). Ağırlıklarla sürekli ayar.
 - **Çıkarım (paper için güçlü):** arbiter policy'si tam da **CPU FMA'yı doyurabildiğinde** (cv32e40p'de L≤1)
   belirleyici; doyuramadığında zaten çekişme yok. FIR'deki "P0≈P1" bir arbiter kusuru değil, workload özelliği.

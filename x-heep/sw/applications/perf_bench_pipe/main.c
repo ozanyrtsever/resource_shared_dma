@@ -108,12 +108,27 @@ static void mac_finish(void){         // kalan MAC'i bitir + sonucu tuket (DCE e
 static void relu_bias(float* Y, const float* b, int M, int B, int relu){
   for(int m=0;m<M;m++) for(int j=0;j<B;j++){ Y[m*B+j]+=b[m]; if(relu&&Y[m*B+j]<0) Y[m*B+j]=0; }
 }
-static void golden(int B){
-  for(int j=0;j<B;j++){
-    for(int m=0;m<M1;m++){ float s=0; for(int i=0;i<N1;i++) s=fmaf(x0[j*N1+i],W1[m*N1+i],s);  ga1[j*M1+m]=s+Bb1[m]; if(ga1[j*M1+m]<0) ga1[j*M1+m]=0; }
-    for(int m=0;m<M2;m++){ float s=0; for(int i=0;i<N2;i++) s=fmaf(ga1[j*M1+i],W2[m*N2+i],s); ga2[j*M2+m]=s+Bb2[m]; if(ga2[j*M2+m]<0) ga2[j*M2+m]=0; }
-    for(int m=0;m<M3;m++){ float s=0; for(int i=0;i<N3;i++) s=fmaf(ga2[j*M2+i],W3[m*N3+i],s); ga3[j*M3+m]=s+Bb3[m]; }
+// CPU dense katman (gercekci batched inference): agirlik batch(B=8) boyunca TEKRAR KULLANILIR
+// (1 kez yukle, 8 lane'de kullan) + 8 bagimsiz akumulator (pipelined FPU'da latency gizler).
+// Toplama sirasi lane basina i=0..N-1 KORUNUR -> eski golden + coprocessor ile bit-exact.
+static void fc_cpu(const float* W, const float* x, const float* b, int N, int M, float* Y, int relu){
+  for(int m=0;m<M;m++){
+    float a0=0,a1=0,a2=0,a3=0,a4=0,a5=0,a6=0,a7=0;
+    const float* wm=&W[m*N];
+    for(int i=0;i<N;i++){ float w=wm[i];
+      a0=fmaf(w,x[0*N+i],a0); a1=fmaf(w,x[1*N+i],a1); a2=fmaf(w,x[2*N+i],a2); a3=fmaf(w,x[3*N+i],a3);
+      a4=fmaf(w,x[4*N+i],a4); a5=fmaf(w,x[5*N+i],a5); a6=fmaf(w,x[6*N+i],a6); a7=fmaf(w,x[7*N+i],a7); }
+    float bb=b[m];
+    #define ST(J,A){ float v=A+bb; Y[(J)*M+m]=(relu&&v<0)?0.0f:v; }
+    ST(0,a0)ST(1,a1)ST(2,a2)ST(3,a3)ST(4,a4)ST(5,a5)ST(6,a6)ST(7,a7)
+    #undef ST
   }
+}
+static void golden(int B){            // B==BATCH==8 (fc_cpu 8-lane; batch weight-reuse)
+  (void)B;
+  fc_cpu(W1, x0,  Bb1, N1,M1, ga1, 1);
+  fc_cpu(W2, ga1, Bb2, N2,M2, ga2, 1);
+  fc_cpu(W3, ga2, Bb3, N3,M3, ga3, 0);
 }
 static int bitexact(int B){ for(int j=0;j<B;j++) for(int m=0;m<M3;m++) if(out3[m*B+j]!=ga3[j*M3+m]) return 0; return 1; }
 

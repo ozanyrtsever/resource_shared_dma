@@ -32,8 +32,10 @@ requestor. The final coprocessor (`dma_fp_dot_accel_pipe`) does exactly this, de
 result-collection so up to *L*+1 of its MACs are in flight at once; its per-MAC cost is therefore
 **independent of the FMA latency** (flat ≈ 1.12–1.14 cyc/MAC across *L* = 0..5), and **one** pipelined
 unit saturates the FMA — retiring an earlier dual-coprocessor variant. On the X-HEEP SoC (Verilator),
-the design runs a toy MLP at **5.45×** and real **LeNet-300-100 / MNIST** at **8.37×** over the CPU,
-**bit-exact** with the CPU (it uses the CPU's own FMA) at **8/8** MNIST accuracy; a CPU floating-point
+the design runs a toy MLP at **2.5×** and real **LeNet-300-100 / MNIST** at **3.4×** over an *optimized*
+CPU baseline at the stock combinational FMA (*L* = 0), rising to **5.2×** and **7.0×** as the FMA pipeline
+deepens — the coprocessor keeps the pipeline full while the scalar CPU (limited to ~2 outstanding FP ops)
+cannot — **bit-exact** with the CPU (it uses the CPU's own FMA) at **8/8** MNIST accuracy; a CPU floating-point
 DSP kernel can run **concurrently** on the shared FMA at negligible cost. Synthesized in TSMC 40 nm at
 its **260 MHz** operating point (Synopsys DC-NXT), the sharing mechanism costs a **1.8 k µm² arbiter —
 8.4 % of one FMA, 2.0 % of the core** — i.e. per accelerator **3.9× less added area** than giving it a
@@ -540,8 +542,11 @@ policy sweep on both a toy MLP and a real published network.
 CPU-priority, owner-tagged, no-drain APU arbiter are integrated on X-HEEP and verified end to end. The
 coprocessor issues every multiply-accumulate to the CPU's own FPnew FMA; a full `L × policy` sweep
 (21 configurations each) on a toy MLP and on real LeNet-300-100 is **bit-exact** at every point, with
-LeNet **8/8** MNIST-correct. Performance shows `cyc/MAC` **flat in L** (≈ 1.14 / 1.12), **5.49× / 8.44×**
-over the CPU, ~87–88 % FMA utilization; co-execution has the CPU's own FP DSP kernel running
+LeNet **8/8** MNIST-correct. The coprocessor's `cyc/MAC` is **flat in L** (≈ 1.14 / 1.12) at ~87–88 % FMA
+utilization, while the speedup over an **optimized** CPU baseline (batch weight-reuse + 8-way ILP,
+disassembly-verified) **rises with FMA latency** — toy MLP **2.5× (L=0) → 5.2× (L=5)**, LeNet
+**3.4× → 7.0×** — because the scalar CPU (~2 outstanding FP) cannot fill a deep pipeline but the
+coprocessor can; co-execution has the CPU's own FP DSP kernel running
 concurrently on the shared FMA at negligible cost, and a pure-FMA stress kernel (§11.11) makes the
 CPU-priority policy separate sharply from round-robin under genuine per-cycle contention (CPU slowed
 +6–11 % under P0 vs +64 % under P1) while exposing a CV32E40P limit of ≈ 2 outstanding FP ops; and
@@ -1064,8 +1069,9 @@ pipelined single coprocessor of §11.10** (whose final sweeps are in `PERF_BENCH
 `PERF_LENET_PIPE_SWEEP.md`). The dual findings, with
 the coprocessor run **batched** (B = 8) so the shared FMA — not the operand bus — is the bottleneck: **(i)**
 batching flips the memory-bound single-image GEMV into a compute-bound GEMM (LeNet, L = 0: 1.12 cyc/MAC,
-≈ 88 % FMA-issue utilisation, **8.34× vs the CPU**, all bit-exact, and 8/8 MNIST images classified
-correctly); **(ii)** the **second coprocessor is a latency-hiding device** whose value grows with FMA
+≈ 88 % FMA-issue utilisation, **8.34× vs the then-naive CPU baseline**, all bit-exact, and 8/8 MNIST images
+classified correctly — note this is the old naive baseline; the optimized-baseline final result (§11.10/§11.11)
+is 3.4× at L = 0, rising to 7.0× at L = 5); **(ii)** the **second coprocessor is a latency-hiding device** whose value grows with FMA
 latency — only ~1.12× at L = 0 (one accelerator already fills the unit) but **~1.99× at L ≥ 2**, keeping the
 dual **3.1×–9.1× vs the CPU** across the whole latency range; and **(iii)** the **arbiter policy is decisive
 precisely when the FMA is saturated** (compute-bound): CPU-strict holds the CPU's own job within ≤ 9 % even
@@ -1101,9 +1107,12 @@ all bit-exact; LeNet also 8/8 MNIST correct), the pipelined single coprocessor h
 respectively across the entire latency range — where the serial unit grew to `1.14 + L` (up to 6.14).
 Utilisation of the shared FMA stays at ~87 % (toy) / ~88 % (LeNet) at every latency, i.e. within ~13 % of
 the unit's one-MAC-per-cycle ceiling, from a single accelerator. Against the serial single this is up to
-**4.2× (toy) / 5.2× (LeNet) faster at L = 5** with the *same* hardware; against the CPU it holds
-**5.3× (toy) / 8.3× (LeNet) at every latency**, where the serial single had decayed toward parity
-(1.25× / 1.60× at L = 5). Most tellingly, the single pipelined unit **matches or beats the two-coprocessor
+**4.2× (toy) / 5.2× (LeNet) faster at L = 5** with the *same* hardware. Against an **optimized** CPU
+baseline (batch weight-reuse + 8-way ILP, disassembly-verified), the speedup **rises with FMA latency** —
+**2.5× → 5.2× (toy)** and **3.4× → 7.0× (LeNet)** from L = 0 to L = 5 — because that CPU is itself limited
+to ~2 outstanding FP ops (§11.11) and cannot fill a deep pipeline, while the coprocessor keeps it full; the
+gap is thus the coprocessor's pipeline-filling advantage, widening with pipeline depth. At L = 0 (the stock
+combinational FMA) the gap is smallest, since even the limited CPU can feed a shallow pipeline. Most tellingly, the single pipelined unit **matches or beats the two-coprocessor
 dual for every `L ≥ 1`** — its compute is 2.7× faster than the two serial units at L = 5 — at half the
 coprocessors and half the operand-bus traffic; only at L = 0, where there is no latency to hide, do two
 serial channels edge it by ~10 % on pure compute. Contention with a concurrent CPU FP filter stays
@@ -1144,9 +1153,9 @@ itself and cannot flood the unit however much instruction-level parallelism the 
 
 **Under genuine contention the CPU-priority guarantee is demonstrated with teeth.** At L ≤ 1, where the
 CPU does saturate the FMA, the policies diverge sharply. Strict CPU priority (P0) slows the CPU's own
-stress kernel by only **+6.4 % (toy MLP) / +11.3 % (LeNet)** — the CPU wins essentially every contested
-cycle and the coprocessor absorbs the contention — whereas round-robin (P1) slows it by **+63.6 % /
-+64.2 %**, a **53–57 percentage-point gap** where the FIR had shown none. The asymmetry is the design
+stress kernel by only **+6.7 % (toy MLP) / +11.3 % (LeNet)** — the CPU wins essentially every contested
+cycle and the coprocessor absorbs the contention — whereas round-robin (P1) slows it by **+64.6 % /
++66.5 %**, a **55–58 percentage-point gap** where the FIR had shown none. The asymmetry is the design
 intent made measurable: P0 protects the CPU's own floating-point work by construction, at the cost of
 the coprocessor (which slows more under P0 than under P1: +31 % vs +27 % on LeNet). The QoS policy dials
 the full spectrum between these extremes — CPU-weighted `4:1:1` holds the CPU to +22–26 %, while
@@ -1386,8 +1395,9 @@ independent runs), giving the corrected 4.79× single-inference speedup.
 | `dc_scripts/` | N | Reorganized DC-NXT flow: `converge.sh` (`CLK += |WNS|/2` → 260 MHz operating point), `study.sh` + `study.tcl` (hierarchy-preserved area/Fmax, per-component extraction, FMA-specific `report_timing -through`), `rtl_core.f` / `rtl_accel_pipe.f` filelists. Outputs to `dc_reports/`, work in `dc_work/`. |
 | `PAPER_NOTES.md`, `PERF_BENCH_PIPE_SWEEP.md`, `PERF_LENET_PIPE_SWEEP.md`, `DC_STUDY_OPERATING.md` | N | The compact technical dossier and the three companion measurement reports (Appendix A). |
 
-**Result (final):** `cyc/MAC` flat in L (≈ 1.14 MLP / 1.12 LeNet), **5.45× / 8.37×** vs CPU, all
-bit-exact (LeNet 8/8); co-execution CPU FIR + coproc share one FMA at negligible cost; DC-NXT at
+**Result (final):** coproc `cyc/MAC` flat in L (≈ 1.14 MLP / 1.12 LeNet); speedup over an optimized CPU
+baseline **rises with L** — **2.5×→5.2× (MLP) / 3.4×→7.0× (LeNet)** across L = 0..5 — all bit-exact
+(LeNet 8/8); co-execution CPU FIR + coproc share one FMA at negligible cost; DC-NXT at
 **260 MHz** gives arbiter = 8.4 % of one FMA, 3.9× less added area per accelerator than a dedicated FMA.
 The pipelined single unit retires the dual as the headline design.
 
@@ -1397,8 +1407,10 @@ The pipelined single unit retires the dual as the headline design.
 no-drain APU arbiter that time-shares the CPU's one FMA, driven by a **pipelined single coprocessor**
 that issues a batch's independent MACs back-to-back to hide the FMA latency — is implemented and
 evaluated end-to-end on the real X-HEEP SoC. Across a full L × policy sweep it is **bit-exact** with
-the CPU (LeNet 8/8 MNIST), runs a toy MLP at **5.45×** and LeNet-300-100 at **8.37×** with `cyc/MAC`
-flat in L, co-executes with the CPU's own floating-point work on the one FMA at negligible cost, and —
+the CPU (LeNet 8/8 MNIST), runs a toy MLP at **2.5×→5.2×** and LeNet-300-100 at **3.4×→7.0×** over an
+optimized CPU baseline as the FMA pipeline deepens (L = 0..5; the coprocessor fills the pipeline the
+scalar CPU cannot), the coprocessor's `cyc/MAC` flat in L, co-executes with the CPU's own floating-point
+work on the one FMA at negligible cost, and —
 synthesized in TSMC 40 nm at its **260 MHz** operating point — adds a **1.8 k µm² arbiter (8.4 % of one
 FMA)** instead of a whole FMA, i.e. **3.9× less added area per accelerator** than a dedicated-FMA
 design: the "no second FPU" claim, quantified. Earlier design points (interleaved-pair dot product,

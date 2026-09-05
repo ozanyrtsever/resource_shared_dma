@@ -34,8 +34,8 @@ the exact diff applied to the vendored/template files.
 | Result | Number |
 |---|---|
 | **Performance — `cyc/MAC` flat in FMA latency** (pipelining hides L) | toy MLP **1.14**, LeNet **1.12**, constant across L = 0..5 (a serial unit grows to 1.14 + L) |
-| **Speedup vs CPU** (bit-exact, LeNet 8/8 MNIST correct) | toy MLP **5.45×**, LeNet-300-100 **8.37×**; ~87–88 % FMA-issue utilization |
-| **Real time @ 260 MHz** (cycle × 3.845 ns) | MLP **61.7 µs/img** (vs 337 CPU), LeNet **1.22 ms/img** (vs 10.2 CPU) |
+| **Speedup vs an optimized CPU baseline** (weight-reuse + 8-way ILP, disassembly-verified; bit-exact, LeNet 8/8) | **rises with FMA latency**: toy MLP **2.5× (L=0) → 5.2× (L=5)**, LeNet **3.4× → 7.0×**. The coprocessor fills the pipeline the scalar CPU (~2 outstanding FP) cannot; gap widens with depth. |
+| **Real time @ 260 MHz** (cycle × 3.845 ns, L=0) | MLP coproc **62.1 µs/img** (vs optimized CPU 154 µs), LeNet **1.22 ms/img** (vs 4.10 ms) |
 | **Co-execution** (CPU FP FIR ∥ coproc inference, one FMA) | coproc +0.12 % (LeNet) / +2.7 % (MLP); CPU FIR +5.4 % / +1.9 % under CPU-strict — both bit-exact |
 | **Area — "no second FPU"** (260 MHz, L0) | core 88.0 k µm² = CPU 52.9 k + FPU 33.2 k (**FMA 21.5 k**) + **arbiter 1.8 k**; arbiter = **8.4 % of one FMA / 2.0 % of core**; coproc logic 4.9 k (buffer = SRAM macro). Per accelerator **3.9× less added area** than a dedicated FMA. |
 | **Frequency** | shared core closes at **260 MHz** (3.845 ns, WNS→0 via `converge.sh`); L0 binding path is the CPU load-store pipeline, not the FMA |
@@ -77,8 +77,8 @@ x-heep/
   dc_scripts/                   Design Compiler NXT flow: converge.sh (find 260 MHz), study.sh + study.tcl
                                     (hierarchy-preserved area/Fmax, per-component extraction), rtl_*.f
   sw/applications/
-    perf_bench_pipe/  *** FINAL: pipelined coprocessor on the toy MLP — cyc/MAC flat 1.14, 5.45× vs CPU ***
-    perf_lenet_pipe/  *** FINAL: pipelined coprocessor on REAL LeNet — cyc/MAC flat 1.12, 8.37×, 8/8 correct ***
+    perf_bench_pipe/  *** FINAL: pipelined coprocessor on the toy MLP — cyc/MAC flat 1.14, 2.5x->5.2x vs CPU ***
+    perf_lenet_pipe/  *** FINAL: pipelined coprocessor on REAL LeNet — cyc/MAC flat 1.12, 3.4x->7.0x, 8/8 correct ***
     perf_lenet/       LeNet MNIST data location (lenet_mnist_data.h, regenerated) used by perf_lenet_pipe
     ml_lenet, ml_coexec, ml_dual, ml_conv1[_full], ml_rt_gemv[_2d], ml_fc_bringup
                       evaluation-journey demos (§11): dense layer, conv, LeNet, co-exec, dual — history

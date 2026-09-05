@@ -92,12 +92,28 @@ static void mac_finish(void){ unsigned t0,t1; CSR_READ(CSR_REG_MCYCLE,&t0);
 static void relu_bias(float* Y, const unsigned int* b, int M, int B, int relu){
   for(int m=0;m<M;m++) for(int j=0;j<B;j++){ Y[m*B+j]+=w2f(b[m]); if(relu&&Y[m*B+j]<0) Y[m*B+j]=0; }
 }
-static void golden(int B){
-  for(int j=0;j<B;j++){
-    for(int m=0;m<M1;m++){ float s=0; for(int i=0;i<N1;i++) s=fmaf(x0[j*N1+i],w2f(fc1_w[m*N1+i]),s);  ga1[j*M1+m]=s+w2f(fc1_b[m]); if(ga1[j*M1+m]<0) ga1[j*M1+m]=0; }
-    for(int m=0;m<M2;m++){ float s=0; for(int i=0;i<N2;i++) s=fmaf(ga1[j*M1+i],w2f(fc2_w[m*N2+i]),s); ga2[j*M2+m]=s+w2f(fc2_b[m]); if(ga2[j*M2+m]<0) ga2[j*M2+m]=0; }
-    for(int m=0;m<M3;m++){ float s=0; for(int i=0;i<N3;i++) s=fmaf(ga2[j*M2+i],w2f(fc3_w[m*N3+i]),s); ga3[j*M3+m]=s+w2f(fc3_b[m]); }
+// CPU dense katman (gercekci batched inference): agirlik batch(B=8) boyunca TEKRAR KULLANILIR
+// (1 kez yukle, 8 lane'de kullan) + 8 bagimsiz akumulator (pipelined FPU'da latency gizler).
+// Agirlik/bias header'da uint32 -> w2f bit-cast (float load ile ayni maliyet). Toplama sirasi
+// lane basina i=0..N-1 KORUNUR -> eski golden + coprocessor ile bit-exact.
+static void fc_cpu(const unsigned int* W, const float* x, const unsigned int* b, int N, int M, float* Y, int relu){
+  for(int m=0;m<M;m++){
+    float a0=0,a1=0,a2=0,a3=0,a4=0,a5=0,a6=0,a7=0;
+    const unsigned int* wm=&W[m*N];
+    for(int i=0;i<N;i++){ float w=w2f(wm[i]);
+      a0=fmaf(w,x[0*N+i],a0); a1=fmaf(w,x[1*N+i],a1); a2=fmaf(w,x[2*N+i],a2); a3=fmaf(w,x[3*N+i],a3);
+      a4=fmaf(w,x[4*N+i],a4); a5=fmaf(w,x[5*N+i],a5); a6=fmaf(w,x[6*N+i],a6); a7=fmaf(w,x[7*N+i],a7); }
+    float bb=w2f(b[m]);
+    #define ST(J,A){ float v=A+bb; Y[(J)*M+m]=(relu&&v<0)?0.0f:v; }
+    ST(0,a0)ST(1,a1)ST(2,a2)ST(3,a3)ST(4,a4)ST(5,a5)ST(6,a6)ST(7,a7)
+    #undef ST
   }
+}
+static void golden(int B){            // B==BATCH==8 (fc_cpu 8-lane; batch weight-reuse)
+  (void)B;
+  fc_cpu(fc1_w, x0,  fc1_b, N1,M1, ga1, 1);
+  fc_cpu(fc2_w, ga1, fc2_b, N2,M2, ga2, 1);
+  fc_cpu(fc3_w, ga2, fc3_b, N3,M3, ga3, 0);
 }
 static int bitexact(int B){ for(int j=0;j<B;j++) for(int m=0;m<M3;m++) if(out3[m*B+j]!=ga3[j*M3+m]) return 0; return 1; }
 static int argmax_col(const float* Y, int j, int B, int M){ int best=0; for(int m=1;m<M;m++) if(Y[m*B+j]>Y[best*B+j]) best=m; return best; }
