@@ -116,7 +116,9 @@ Hesaplar: `Y[M][B] = W[M][N] · X[N][B]` (B=1 → matris-vektör). **Decoupled i
   naive değil, adil/savunulabilir kıyas (L=0'da 3.7-4.0 cyc/MAC; naive 8-10 idi).
 - **Sweep'ler:** FMA latency `L=0..5` × arbiter policy `P=0/1/2` (her benchmark 21 config), **hepsi
   bit-exact** → (i) `cyc/MAC` L'den bağımsız mı (pipelining kanıtı), (ii) policy'nin co-execution'a etkisi.
-  Benchmark'lar: `perf_bench_pipe` (toy MLP), `perf_lenet_pipe` (gerçek LeNet).
+  Benchmark'lar: `perf_bench_pipe` (toy MLP), `perf_lenet_pipe` (gerçek LeNet), `perf_resnet8_pipe`
+  (gerçek CNN — resmi MLPerf-Tiny pretrained ResNet-8/CIFAR-10; **stock L=0 noktasında** ölçüldü,
+  co-execution metrikleri yok → `[1]`/`[3]` policy-bağımsız, 5 policy config'i bit-özdeş çıktı = kanıt).
 - **Sentez (DC-NXT, TSMC 40 nm G):** `cv32e40px_top` (arbiter içinde) hiyerarşi korunarak
   (`-no_autoungroup -no_boundary_optimization`) → FMA/FPU/arbiter/CPU alanları **tek run'dan ayrıştırıldı**;
   coprocessor ayrı (buffer black-box → logic-only). **Operating clock convergence** (`converge.sh`,
@@ -142,6 +144,13 @@ Hesaplar: `Y[M][B] = W[M][N] · X[N][B]` (B=1 → matris-vektör). **Decoupled i
 - **FMA util** (paylaşılan birim) ≈ %87-88 her L'de.
 - **Gerçek zaman @ 260 MHz (L=0):** MLP inference **62.1 µs/img** (CPU 154 µs); LeNet **1.22 ms/img** (CPU
   4.10 ms). **8/8 MNIST doğru**, bit-exact. (L=5'te fark ~5.2× / ~7×'e çıkar.)
+- **Gerçek CNN — ResNet-8 (MLPerf-Tiny, resmi pretrained, %87.19 CIFAR-10):** **RTL değişikliği SIFIR** —
+  conv katmanları **im2col** ile aynı `[N,M,B]` protokolüne oturur (N=K²·C_in ≤ 576 ≤ MAXN; TF-'same' padding,
+  stride-2, residual/pool CPU'da). **L=0'da 3.12×** (optimize baseline'a karşı; L=0 alt sınır), coproc cyc/MAC
+  **1.14 — üç workload'da da aynı** (MLP 1.14 / LeNet 1.12 / CNN 1.14 → pipelining workload-bağımsız).
+  **10/10 katman bit-exact**, resmi model tahminleri birebir (**match_ref 8/8**; `correct=7/8` modelin kendi
+  hatası). Katman kırılımı: cyc/MAC **3.17 (N=27) → 1.36 (N=576)** monoton → "uzun redüksiyon daha iyi
+  amortize olur" tezinin ağ-içi kanıtı. Görüntü başına **86.4 ms** (CPU 269.8 ms) @ 260 MHz.
 
 ### 6.2 Co-execution (CPU FP işi ∥ coproc inference, tek FMA)
 
@@ -222,6 +231,7 @@ FMA ister, coproc'la gerçekten aynı cycle'da çekişir. İki ana bulgu:
 ## 9. İlgili güncel raporlar (ham tablolar)
 - `PERF_BENCH_PIPE_SWEEP.md` — toy-MLP perf (5 metrik × L × policy + gerçek zaman).
 - `PERF_LENET_PIPE_SWEEP.md` — gerçek LeNet perf (+ accuracy + gerçek zaman).
+- `PERF_RESNET8_PIPE_SWEEP.md` — gerçek CNN (resmi MLPerf-Tiny ResNet-8) @ L=0: 3.12×, katman kırılımı, bit-exact.
 - `DC_STUDY_OPERATING.md` — DC alan & fmax @ 260 MHz (+250 MHz), convergence, bileşen breakdown.
 
 ## 10. Açık / opsiyonel işler

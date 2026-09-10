@@ -3,7 +3,7 @@
         ram_banks: {
         code_and_data: {
             num: 2
-            sizes: [1024]
+            sizes: [2048]
         }
     }
 

@@ -553,6 +553,9 @@ CPU-priority policy separate sharply from round-robin under genuine per-cycle co
 Synopsys DC-NXT (TSMC 40 nm) gives the area and
 Fmax at the converged **260 MHz** operating point with a per-component breakdown, from which the "no
 second FPU" claim is quantified (arbiter = 8.4 % of one FMA; 3.9× less added area per accelerator).
+A real CNN completes the workload set: the official MLPerf-Tiny pretrained **ResNet-8** (CIFAR-10, 87.19 %)
+runs end-to-end via im2col with **zero RTL change** — all layers bit-exact, official predictions reproduced,
+**3.12× at the stock L = 0 point** with the same 1.14 cyc/MAC as the other workloads (§11.12).
 Verilator cycle counts convert to wall-clock at that operating point (× 3.845 ns). Full tables are in
 the companion reports (Appendix A).
 
@@ -1166,6 +1169,36 @@ honest one: **the arbiter policy is decisive exactly when the host can saturate 
 near-identical FIR result reflects the workload, not the arbiter.** Full per-latency and per-policy
 tables (metrics [6]–[8]) are in `PERF_BENCH_PIPE_SWEEP.md` and `PERF_LENET_PIPE_SWEEP.md`, §2b.
 
+### 11.12 A real CNN with zero hardware change: MLPerf-Tiny ResNet-8
+
+The evaluation so far exercises dense (fully-connected) layers. To show the coprocessor covers real
+convolutional networks as well, the **official MLCommons/MLPerf-Tiny pretrained ResNet-8** (CIFAR-10,
+FP32, 87.19 % test accuracy) was run end-to-end **without any RTL change**: each convolution maps onto
+the existing `[N, M, B]` protocol via **im2col** — for every output pixel the driver LOADs the eight
+images' receptive-field patches (N = K²·C_in ≤ 576, comfortably inside the 1024-word input buffer) and
+streams the layer's filter bank as the WEIGHT transfer (M = C_out rows). TensorFlow-'same' padding
+indices and the (ky,kx,c) patch order are reproduced exactly; the network itself is used as published
+(BatchNorm folded at export — a mathematically identical inference transform — and the export is guarded
+by a logit-level numpy self-check against Keras). Stride-2 convolutions, the 1×1 skip projections, the
+residual adds, ReLU, and global average pooling all live in the C driver on the CPU side and are counted
+in both totals. Because this benchmark measures inference only (no concurrent CPU workload), it is
+evaluated at the **stock operating point (L = 0, CPU-strict)** — the latency and policy dimensions are
+characterized on the MLP/LeNet workloads, and the five arbiter-policy configurations run for the CNN
+produced **bit-identical** results, directly confirming policy independence.
+
+The results: **all ten layers bit-exact** against the optimized CPU golden (which executes even the
+padded multiply-accumulates identically, so bit-exactness holds in every corner case), the device
+reproduces the official model's predictions exactly (**match_ref 8/8**; `correct = 7/8` because the
+pretrained model itself misclassifies one of the eight images — the honest signature of running the
+network as-is), and the coprocessor sustains **1.14 cyc/MAC — the same figure as on the MLP (1.14) and
+LeNet (1.12)** — demonstrating that the pipelined batched engine is workload-independent. End-to-end the
+CNN runs **3.12× faster** than the optimized CPU baseline at L = 0 (the coprocessor's hardest operating
+point, i.e. a lower bound; per image 86.4 ms vs 269.8 ms at 260 MHz). A per-layer breakdown adds an
+in-network confirmation of the dataflow thesis: the layer-level cyc/MAC (transfer overhead included)
+improves monotonically with dot length, from 3.17 at N = 27 (the 3-channel first conv) to 1.36 at
+N = 576 (the 64-channel deep conv) — **the coprocessor favours long reductions, and deep CNN layers are
+exactly that**. Full tables in `PERF_RESNET8_PIPE_SWEEP.md`.
+
 ---
 
 ## Appendix A — Reproducibility (current, X-HEEP)
@@ -1394,6 +1427,10 @@ independent runs), giving the corrected 4.79× single-inference speedup.
 | `sweep.sh` | E | Drives the 21-config L × policy sweep (+ QoS weight variants) for the pipe apps into `sweep_results/bench_pipe/` and `sweep_results/lenet_pipe/`. |
 | `dc_scripts/` | N | Reorganized DC-NXT flow: `converge.sh` (`CLK += |WNS|/2` → 260 MHz operating point), `study.sh` + `study.tcl` (hierarchy-preserved area/Fmax, per-component extraction, FMA-specific `report_timing -through`), `rtl_core.f` / `rtl_accel_pipe.f` filelists. Outputs to `dc_reports/`, work in `dc_work/`. |
 | `PAPER_NOTES.md`, `PERF_BENCH_PIPE_SWEEP.md`, `PERF_LENET_PIPE_SWEEP.md`, `DC_STUDY_OPERATING.md` | N | The compact technical dossier and the three companion measurement reports (Appendix A). |
+| `example_model/gen_resnet8_cifar.py` | N | **CNN export (2026-09).** Downloads nothing itself; consumes the official MLCommons-Tiny `pretrainedResnet.h5` (FP32), auto-detects the input preprocessing (raw 0-255) against CIFAR-10 test accuracy, folds BN into the convs (conv-bias handled), flattens filters in the device's (ky,kx,ci) im2col order, and guards the export with a logit-level numpy self-check (exact device semantics) against Keras. |
+| `sw/applications/perf_resnet8_pipe/main.c` | N | **CNN benchmark.** Per-pixel im2col driver on the unchanged `[N,M,B]` protocol (TF-'same' indices incl. stride-2 asymmetric padding); optimized conv golden (8 batch accumulators + weight reuse, padded MACs executed identically → bit-exact); residual/ReLU/avg-pool shared CPU code counted in both totals; per-layer bit-exact + cycle prints; metrics [1]/[3] + accuracy (inference-only → policy-independent). |
+| `configs/cv32e40px_fpu_dma.hjson` | E | SRAM enlarged 2 MB → **4 MB** (`sizes:[2048]`) for the CNN's B=8 FP32 activations (three 512 KB tensors live per residual block). |
+| `PERF_RESNET8_PIPE_SWEEP.md` | N | CNN results report: 3.12× @ L=0, 1.14 cyc/MAC, per-layer breakdown (3.17→1.36 cyc/MAC vs dot length), 5 policy configs bit-identical. |
 
 **Result (final):** coproc `cyc/MAC` flat in L (≈ 1.14 MLP / 1.12 LeNet); speedup over an optimized CPU
 baseline **rises with L** — **2.5×→5.2× (MLP) / 3.4×→7.0× (LeNet)** across L = 0..5 — all bit-exact

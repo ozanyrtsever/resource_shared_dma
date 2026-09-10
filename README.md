@@ -23,6 +23,7 @@ the exact diff applied to the vendored/template files.
 - **Companion measurement reports** (self-contained, every number explained):
   - `PERF_BENCH_PIPE_SWEEP.md` — toy-MLP L×policy sweep (pipelined single).
   - `PERF_LENET_PIPE_SWEEP.md` — real LeNet-300-100 / MNIST L×policy sweep (+ accuracy, + real time).
+  - `PERF_RESNET8_PIPE_SWEEP.md` — real CNN (official MLPerf-Tiny ResNet-8) at the stock L=0 point + per-layer breakdown.
   - `DC_STUDY_OPERATING.md` — DC-NXT area & Fmax at the converged **260 MHz** operating point, with a
     per-component (CPU / FPU / FMA / arbiter) breakdown and the "no second FPU" derivation.
   - `COMPARISON_vs_tanase2026.md` — closest prior art, advantages/gaps.
@@ -36,6 +37,7 @@ the exact diff applied to the vendored/template files.
 | **Performance — `cyc/MAC` flat in FMA latency** (pipelining hides L) | toy MLP **1.14**, LeNet **1.12**, constant across L = 0..5 (a serial unit grows to 1.14 + L) |
 | **Speedup vs an optimized CPU baseline** (weight-reuse + 8-way ILP, disassembly-verified; bit-exact, LeNet 8/8) | **rises with FMA latency**: toy MLP **2.5× (L=0) → 5.2× (L=5)**, LeNet **3.4× → 7.0×**. The coprocessor fills the pipeline the scalar CPU (~2 outstanding FP) cannot; gap widens with depth. |
 | **Real time @ 260 MHz** (cycle × 3.845 ns, L=0) | MLP coproc **62.1 µs/img** (vs optimized CPU 154 µs), LeNet **1.22 ms/img** (vs 4.10 ms) |
+| **Real CNN — official MLPerf-Tiny ResNet-8** (CIFAR-10, pretrained, 87.19 %) | runs via **im2col with ZERO RTL change**: **3.12× @ L=0**, coproc **1.14 cyc/MAC** (same as MLP/LeNet), 10/10 layers bit-exact, official predictions reproduced 8/8; per-layer cyc/MAC 3.17→1.36 with dot length. See `PERF_RESNET8_PIPE_SWEEP.md`. |
 | **Co-execution** (CPU FP FIR ∥ coproc inference, one FMA) | coproc +0.12 % (LeNet) / +2.7 % (MLP); CPU FIR +5.4 % / +1.9 % under CPU-strict — both bit-exact |
 | **Area — "no second FPU"** (260 MHz, L0) | core 88.0 k µm² = CPU 52.9 k + FPU 33.2 k (**FMA 21.5 k**) + **arbiter 1.8 k**; arbiter = **8.4 % of one FMA / 2.0 % of core**; coproc logic 4.9 k (buffer = SRAM macro). Per accelerator **3.9× less added area** than a dedicated FMA. |
 | **Frequency** | shared core closes at **260 MHz** (3.845 ns, WNS→0 via `converge.sh`); L0 binding path is the CPU load-store pipeline, not the FMA |
@@ -54,7 +56,8 @@ PERF_LENET_PIPE_SWEEP.md        real-LeNet performance sweep (final, pipelined)
 DC_STUDY_OPERATING.md           DC-NXT area & Fmax at 260 MHz + component breakdown
 COMPARISON_vs_tanase2026.md     closest prior art, advantages/gaps
 CHANGES-to-xheep.patch          exact diff to X-HEEP vendored/template files
-example_model/                  model-export scripts (gen_lenet_mnist.py trains+exports LeNet/MNIST)
+example_model/                  model-export scripts (gen_lenet_mnist.py LeNet/MNIST; gen_resnet8_cifar.py
+                                exports the official MLPerf-Tiny pretrainedResnet.h5 -> device header)
 x-heep/
   hw/vendor/xheep/cv32e40px/rtl/
     dma_apu_arbiter.sv          *** THE contribution: FMA-sharing arbiter — 3-requestor (CPU+acc0+acc1),
@@ -70,7 +73,7 @@ x-heep/
                                     `COPROC_PIPE`/`COPROC_SERIAL` knob selects pipelined vs serial (acc1 idle)
     tb_top.cpp                  Verilator TB; FST tracing guarded by `#if VM_TRACE` (trace-off = fast)
   hw/core-v-mini-mcu/*.tpl      APU-port threading through the SoC hierarchy
-  configs/cv32e40px_fpu_dma.hjson   cv32e40px+FPU, DMA hw_fifo, SRAM enlarged to 2 MB
+  configs/cv32e40px_fpu_dma.hjson   cv32e40px+FPU, DMA hw_fifo, SRAM enlarged to 4 MB (2 MB for LeNet, 4 MB for the CNN activations)
   core-v-mini-mcu.core          `+define+COPROC_FPU_SHARE` master toggle (single-define clean revert)
   sweep.sh                      L×policy×QoS sweep driver (PROJECT/OUTDIR env; resumable)
   util/xheep_gen/load_config.py fpu_addmul_lat forwarding fix (enables the FMA-latency sweep)
@@ -79,6 +82,8 @@ x-heep/
   sw/applications/
     perf_bench_pipe/  *** FINAL: pipelined coprocessor on the toy MLP — cyc/MAC flat 1.14, 2.5x->5.2x vs CPU ***
     perf_lenet_pipe/  *** FINAL: pipelined coprocessor on REAL LeNet — cyc/MAC flat 1.12, 3.4x->7.0x, 8/8 correct ***
+    perf_resnet8_pipe/ *** FINAL: real CNN (official MLPerf-Tiny ResNet-8) via im2col, zero RTL change — 3.12x @ L=0 ***
+    perf_resnet8/     ResNet-8 CIFAR data location (resnet8_cifar_data.h, regenerated) used by perf_resnet8_pipe
     perf_lenet/       LeNet MNIST data location (lenet_mnist_data.h, regenerated) used by perf_lenet_pipe
     ml_lenet, ml_coexec, ml_dual, ml_conv1[_full], ml_rt_gemv[_2d], ml_fc_bringup
                       evaluation-journey demos (§11): dense layer, conv, LeNet, co-exec, dual — history
@@ -87,7 +92,8 @@ x-heep/
                       X-HEEP bring-up + first shared-FMA dot product + Y3 measurement kernels — history
 ```
 (Large generated weight headers `lenet_mnist_data.h` are omitted; regenerate with
-`example_model/gen_lenet_mnist.py` into `sw/applications/perf_lenet/`.)
+`example_model/gen_lenet_mnist.py` into `sw/applications/perf_lenet/`; `resnet8_cifar_data.h` likewise via
+`example_model/gen_resnet8_cifar.py` + the official `pretrainedResnet.h5` from github.com/mlcommons/tiny.)
 
 ## One-line thesis
 Because an MCU's FPU already contains an FMA that a scalar CPU leaves idle most cycles, a DMA-fed
