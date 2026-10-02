@@ -368,6 +368,7 @@ targets:
          - -LDFLAGS "-pthread -lutil"
          - +lint=TFIPC-L
          - -V
+         - '+define+COPROC_FPU_SHARE'
       xcelium:
         xrun_options:
         - -vtimescale 1ns/10ps

@@ -58,6 +58,15 @@ if {[catch {compile_ultra -no_autoungroup -no_boundary_optimization}]} { compile
 # cikti klasoru: study.sh RPT env'i ile clock-basina ayri klasor verir (uzerine yazmasin)
 set RPT "dc_reports"
 if {[info exists ::env(RPT)]} { set RPT $::env(RPT) }
+
+# GATE-LEVEL NETLIST (power/GLS akisi icin): env WRITE_NETLIST=1 ile yazilir.
+# change_names: verilog-uyumsuz isimleri duzelt (GLS derlemesi + SAIF eslesmesi icin sart).
+if {[info exists ::env(WRITE_NETLIST)] && $::env(WRITE_NETLIST) == "1"} {
+  change_names -rules verilog -hierarchy
+  write -format verilog -hierarchy -output $RPT/netlist_$env(RUN).v
+  write_sdc $RPT/netlist_$env(RUN).sdc
+  puts "NETLIST yazildi: $RPT/netlist_$env(RUN).v"
+}
 report_area -hierarchy > $RPT/area_$env(RUN).rpt
 report_timing -nosplit > $RPT/timing_$env(RUN).rpt          ;# global worst (core'un kritik yolu)
 

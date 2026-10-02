@@ -26,6 +26,12 @@ the exact diff applied to the vendored/template files.
   - `PERF_RESNET8_PIPE_SWEEP.md` — real CNN (official MLPerf-Tiny ResNet-8) at the stock L=0 point + per-layer breakdown.
   - `DC_STUDY_OPERATING.md` — DC-NXT area & Fmax at the converged **260 MHz** operating point, with a
     per-component (CPU / FPU / FMA / arbiter) breakdown and the "no second FPU" derivation.
+  - `POWER_ENERGY_STUDY.md` / `POWER_ENERGY_TEKNIK.md` — gate-level power/energy study (hybrid GLS →
+    per-phase SAIF → DC `report_power`): per-phase, per-component power (FMA/FPU/arbiter/coproc/CPU) and
+    the energy-side "no second FPU" result — **sharing does not raise FMA power** (SHARED 8.26 ≈ COPROC
+    9.30 mW), the arbiter (0.06 mW) replaces a second FMA. `STUDY` = what/why + results, `TEKNIK` = the
+    code/scripts and internals (both Turkish). *(Flow + numbers are reproducible; raw DC reports land in
+    `x-heep/dc_reports/power/`, not tracked.)*
   - `COMPARISON_vs_tanase2026.md` — closest prior art, advantages/gaps.
 - **`CHANGES-to-xheep.patch`** — precise edits to X-HEEP's vendored RTL / templates (the arbiter wiring
   threaded through `cv32e40px_top.sv` and the `*.sv.tpl` files). Full copies are also at their real
@@ -54,6 +60,8 @@ thesis_progress.md              full report — narrative + all results + change
 PERF_BENCH_PIPE_SWEEP.md        toy-MLP performance sweep (final, pipelined)
 PERF_LENET_PIPE_SWEEP.md        real-LeNet performance sweep (final, pipelined)
 DC_STUDY_OPERATING.md           DC-NXT area & Fmax at 260 MHz + component breakdown
+POWER_ENERGY_STUDY.md           gate-level power/energy: per-phase, per-component mW + "no 2nd FPU" energy (TR)
+POWER_ENERGY_TEKNIK.md          power study internals: power_probe, saif_ctrl, gls.sh, power.tcl walkthrough (TR)
 COMPARISON_vs_tanase2026.md     closest prior art, advantages/gaps
 CHANGES-to-xheep.patch          exact diff to X-HEEP vendored/template files
 example_model/                  model-export scripts (gen_lenet_mnist.py LeNet/MNIST; gen_resnet8_cifar.py
@@ -78,8 +86,16 @@ x-heep/
   sweep.sh                      L×policy×QoS sweep driver (PROJECT/OUTDIR env; resumable)
   util/xheep_gen/load_config.py fpu_addmul_lat forwarding fix (enables the FMA-latency sweep)
   dc_scripts/                   Design Compiler NXT flow: converge.sh (find 260 MHz), study.sh + study.tcl
-                                    (hierarchy-preserved area/Fmax, per-component extraction), rtl_*.f
+                                    (hierarchy-preserved area/Fmax, per-component extraction; `WRITE_NETLIST=1`
+                                    also dumps the gate netlist+SDC for the power flow), rtl_*.f
+    gls.sh                      *** POWER flow driver: hybrid GLS (netlist swap into RTL X-HEEP) build/run +
+                                    DC report_power; build/run-rtl variants + per-phase SAIF -> dc_reports/power/ ***
+    power.tcl                   DC: read netlist + read_saif + report_power -hierarchy (one block×phase)
+    gls/saif_ctrl.sv           TB-only SAIF monitor (not synthesized): snoops phase_flag store, per-phase $toggle_report
+    gls/saif_selftest.sv       tiny probe used to pin down VCS $toggle_* semantics (-debug_access+pp, string names)
   sw/applications/
+    power_probe/      *** POWER: 5-phase probe (IDLE/CPU_INF/COPROC/CPU_MAC/SHARED), perf_bench_pipe logic
+                                    + phase_flag markers; drives per-phase SAIF for the power study ***
     perf_bench_pipe/  *** FINAL: pipelined coprocessor on the toy MLP — cyc/MAC flat 1.14, 2.5x->5.2x vs CPU ***
     perf_lenet_pipe/  *** FINAL: pipelined coprocessor on REAL LeNet — cyc/MAC flat 1.12, 3.4x->7.0x, 8/8 correct ***
     perf_resnet8_pipe/ *** FINAL: real CNN (official MLPerf-Tiny ResNet-8) via im2col, zero RTL change — 3.12x @ L=0 ***
